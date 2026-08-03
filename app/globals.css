@@ -2374,6 +2374,30 @@ textarea:focus-visible,
   align-items: center;
   gap: 5px;
 }
+.ledger-heading-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted-2);
+  font-size: 8px;
+}
+.admin-badge {
+  min-height: 25px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #4358c6;
+  background: #eef0ff;
+  border: 1px solid #d9defd;
+  border-radius: 12px;
+  font-size: 8px;
+  font-weight: 700;
+}
+.expense-edit-button {
+  width: 32px;
+  height: 32px;
+}
 
 /* Settings ------------------------------------------------ */
 .settings-intro {
@@ -3164,6 +3188,7 @@ textarea:focus-visible,
     display: grid;
   }
   .mobile-expense-card {
+    position: relative;
     min-height: 94px;
     padding: 14px;
     display: grid;
@@ -3199,6 +3224,16 @@ textarea:focus-visible,
     color: #343a46;
     font-size: 13px;
     white-space: nowrap;
+  }
+  .mobile-expense-card:has(.mobile-expense-edit) {
+    min-height: 112px;
+  }
+  .mobile-expense-edit {
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    color: var(--brand);
+    background: var(--brand-soft);
   }
   .settings-add-form {
     grid-template-columns: 1fr;

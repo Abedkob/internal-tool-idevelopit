@@ -5,24 +5,29 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
   CircleDollarSign,
+  Pencil,
   Plus,
   Receipt,
+  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import {
   createExpense,
+  getCurrentUserRole,
   getExpenseSummary,
   listExpenseCategories,
   listExpensesPage,
   listProfiles,
 } from "@/lib/db";
 import { Pagination } from "@/components/Pagination";
+import { EditExpenseModal } from "@/components/EditExpenseModal";
 import { createClient } from "@/lib/supabase/client";
 import { fmtDay, initials, money } from "@/lib/format";
 import type {
   Expense,
   ExpenseCategory,
   ExpenseSummary,
+  AppRole,
   PagedResult,
   Profile,
 } from "@/types/db";
@@ -51,6 +56,8 @@ export function ExpensesClient() {
   });
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [role, setRole] = useState<AppRole>("member");
+  const [editing, setEditing] = useState<Expense | null>(null);
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
@@ -64,7 +71,7 @@ export function ExpensesClient() {
     setError("");
     try {
       const supabase = createClient();
-      const [expenseData, summaryData, categoryData, profileData] =
+      const [expenseData, summaryData, categoryData, profileData, currentRole] =
         await Promise.all([
           listExpensesPage(supabase, {
             page: requestedPage,
@@ -73,11 +80,13 @@ export function ExpensesClient() {
           getExpenseSummary(supabase),
           listExpenseCategories(supabase),
           listProfiles(supabase),
+          getCurrentUserRole(supabase),
         ]);
       setResult(expenseData);
       setSummary(summaryData);
       setCategories(categoryData);
       setProfiles(profileData);
+      setRole(currentRole);
       setCategoryId((current) => current || categoryData[0]?.id || "");
       setPaidBy((current) => current || profileData[0]?.id || "");
     } catch (caught) {
@@ -307,7 +316,14 @@ export function ExpensesClient() {
               <p className="eyebrow">Ledger</p>
               <h2>Recent expenses</h2>
             </div>
-            <span>{result.total} entries</span>
+            <div className="ledger-heading-meta">
+              {role === "superadmin" && (
+                <span className="admin-badge">
+                  <ShieldCheck size={12} /> Superadmin
+                </span>
+              )}
+              <span>{result.total} entries</span>
+            </div>
           </header>
           {result.rows.length ? (
             <>
@@ -320,6 +336,7 @@ export function ExpensesClient() {
                       <th>Paid by</th>
                       <th>Date</th>
                       <th>Amount</th>
+                      {role === "superadmin" && <th aria-label="Actions" />}
                     </tr>
                   </thead>
                   <tbody>
@@ -362,6 +379,17 @@ export function ExpensesClient() {
                         <td>
                           <strong>{money(expense.amount)}</strong>
                         </td>
+                        {role === "superadmin" && (
+                          <td>
+                            <button
+                              className="icon-button expense-edit-button"
+                              onClick={() => setEditing(expense)}
+                              aria-label={`Edit ${expense.description || "expense"}`}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -391,6 +419,15 @@ export function ExpensesClient() {
                     <strong className="mobile-expense-amount">
                       {money(expense.amount)}
                     </strong>
+                    {role === "superadmin" && (
+                      <button
+                        className="icon-button mobile-expense-edit"
+                        onClick={() => setEditing(expense)}
+                        aria-label={`Edit ${expense.description || "expense"}`}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    )}
                   </article>
                 ))}
               </div>
@@ -416,6 +453,18 @@ export function ExpensesClient() {
           />
         </section>
       </div>
+      {editing && (
+        <EditExpenseModal
+          expense={editing}
+          categories={categories}
+          profiles={profiles}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            await load();
+          }}
+        />
+      )}
     </div>
   );
 }

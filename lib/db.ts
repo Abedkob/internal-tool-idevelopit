@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Activity,
   ActivityChannel,
+  AppRole,
   Contact,
   ContactInput,
   ContactStage,
@@ -432,6 +433,19 @@ export async function getCurrentUserId(supabase: SupabaseClient) {
   return user.id;
 }
 
+export async function getCurrentUserRole(
+  supabase: SupabaseClient,
+): Promise<AppRole> {
+  const userId = await getCurrentUserId(supabase);
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("app_role")
+    .eq("id", userId)
+    .single();
+  throwIfError(error);
+  return data?.app_role === "superadmin" ? "superadmin" : "member";
+}
+
 export async function createContact(
   supabase: SupabaseClient,
   input: ContactInput,
@@ -469,14 +483,12 @@ export async function moveContact(
     .update({ stage })
     .eq("id", contact.id);
   throwIfError(updateError);
-  const { error: activityError } = await supabase
-    .from("activities")
-    .insert({
-      contact_id: contact.id,
-      author: userId,
-      channel: null,
-      note: `Moved from ${contact.stage} to ${stage}`,
-    });
+  const { error: activityError } = await supabase.from("activities").insert({
+    contact_id: contact.id,
+    author: userId,
+    channel: null,
+    note: `Moved from ${contact.stage} to ${stage}`,
+  });
   throwIfError(activityError);
   notifyDataChanged();
 }
@@ -553,15 +565,13 @@ export async function addTaskItem(
   sortOrder: number,
 ) {
   const userId = await getCurrentUserId(supabase);
-  const { error } = await supabase
-    .from("task_items")
-    .insert({
-      task_id: taskId,
-      content,
-      parent_id: parentId,
-      sort_order: sortOrder,
-      created_by: userId,
-    });
+  const { error } = await supabase.from("task_items").insert({
+    task_id: taskId,
+    content,
+    parent_id: parentId,
+    sort_order: sortOrder,
+    created_by: userId,
+  });
   throwIfError(error);
   notifyDataChanged();
 }
@@ -604,6 +614,22 @@ export async function createExpense(
   const { error } = await supabase
     .from("expenses")
     .insert({ ...input, created_by: userId });
+  throwIfError(error);
+  notifyDataChanged();
+}
+
+export async function updateExpense(
+  supabase: SupabaseClient,
+  id: string,
+  input: {
+    amount: number;
+    category_id: string;
+    description: string | null;
+    spent_on: string;
+    paid_by: string;
+  },
+) {
+  const { error } = await supabase.from("expenses").update(input).eq("id", id);
   throwIfError(error);
   notifyDataChanged();
 }

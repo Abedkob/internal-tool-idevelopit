@@ -15,11 +15,13 @@ export type ActivityChannel =
 export type PaymentStatus = "paid" | "pending";
 export type TaskPriority = "low" | "normal" | "high";
 export type TaskStatus = "open" | "done";
+export type AppRole = "member" | "superadmin";
 
 export type Profile = {
   id: string;
   name: string;
   color: string;
+  app_role: AppRole;
   created_at: string;
 };
 
