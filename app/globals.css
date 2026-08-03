@@ -546,6 +546,16 @@ textarea:focus-visible,
 .button-primary:hover {
   background: var(--brand-dark);
 }
+.button-danger {
+  color: #a63d45;
+  background: #fff3f3;
+  border: 1px solid #efc9cd;
+}
+.button-danger:hover {
+  color: white;
+  background: var(--danger);
+  border-color: var(--danger);
+}
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -2398,6 +2408,36 @@ textarea:focus-visible,
   width: 32px;
   height: 32px;
 }
+.expense-danger-zone {
+  margin: 20px 0 0;
+  padding: 13px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #fbfbfc;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+}
+.expense-danger-zone.confirming {
+  background: #fff6f6;
+  border-color: #efc9cd;
+}
+.expense-danger-zone > div {
+  min-width: 0;
+  flex: 1;
+}
+.expense-danger-zone strong {
+  color: #4c525e;
+  font-size: 10px;
+}
+.expense-danger-zone p {
+  margin: 4px 0 0;
+  color: var(--muted-2);
+  font-size: 8px;
+}
+.expense-danger-zone .button {
+  flex: 0 0 auto;
+}
 
 /* Settings ------------------------------------------------ */
 .settings-intro {
@@ -3234,6 +3274,14 @@ textarea:focus-visible,
     bottom: 10px;
     color: var(--brand);
     background: var(--brand-soft);
+  }
+  .expense-danger-zone {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .expense-danger-zone .button {
+    width: 100%;
+    justify-content: center;
   }
   .settings-add-form {
     grid-template-columns: 1fr;

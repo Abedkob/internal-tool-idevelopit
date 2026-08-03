@@ -634,6 +634,12 @@ export async function updateExpense(
   notifyDataChanged();
 }
 
+export async function deleteExpense(supabase: SupabaseClient, id: string) {
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
+  throwIfError(error);
+  notifyDataChanged();
+}
+
 async function assertUniqueName(
   supabase: SupabaseClient,
   table: "services" | "expense_categories",

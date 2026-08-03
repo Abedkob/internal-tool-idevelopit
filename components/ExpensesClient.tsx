@@ -463,6 +463,10 @@ export function ExpensesClient() {
             setEditing(null);
             await load();
           }}
+          onDeleted={async () => {
+            setEditing(null);
+            await load();
+          }}
         />
       )}
     </div>

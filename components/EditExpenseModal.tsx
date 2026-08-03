@@ -1,8 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Save, X } from "lucide-react";
-import { updateExpense } from "@/lib/db";
+import { Save, Trash2, X } from "lucide-react";
+import { deleteExpense, updateExpense } from "@/lib/db";
 import { createClient } from "@/lib/supabase/client";
 import { useDialogFocus } from "@/lib/useDialogFocus";
 import type { Expense, ExpenseCategory, Profile } from "@/types/db";
@@ -13,12 +13,14 @@ export function EditExpenseModal({
   profiles,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   expense: Expense;
   categories: ExpenseCategory[];
   profiles: Profile[];
   onClose: () => void;
   onSaved: () => Promise<void>;
+  onDeleted: () => Promise<void>;
 }) {
   const [amount, setAmount] = useState(String(expense.amount));
   const [categoryId, setCategoryId] = useState(
@@ -30,6 +32,8 @@ export function EditExpenseModal({
     expense.paid_by ?? profiles[0]?.id ?? "",
   );
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useDialogFocus<HTMLElement>(onClose);
 
@@ -62,6 +66,26 @@ export function EditExpenseModal({
           : "Expense changes could not be saved.",
       );
       setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteExpense(createClient(), expense.id);
+      await onDeleted();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Expense could not be deleted.",
+      );
+      setDeleting(false);
     }
   }
 
@@ -155,6 +179,45 @@ export function EditExpenseModal({
               {error}
             </p>
           )}
+          <div
+            className={`expense-danger-zone ${confirmDelete ? "confirming" : ""}`}
+          >
+            <div>
+              <strong>
+                {confirmDelete
+                  ? "Delete this expense permanently?"
+                  : "Delete expense"}
+              </strong>
+              <p>
+                {confirmDelete
+                  ? "This action cannot be undone."
+                  : "Only superadmins can remove ledger entries."}
+              </p>
+            </div>
+            {confirmDelete && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+              >
+                Keep expense
+              </button>
+            )}
+            <button
+              type="button"
+              className="button button-danger"
+              onClick={remove}
+              disabled={saving || deleting}
+            >
+              <Trash2 size={15} />
+              {deleting
+                ? "Deleting..."
+                : confirmDelete
+                  ? "Delete permanently"
+                  : "Delete"}
+            </button>
+          </div>
           <footer className="modal-actions">
             <button
               type="button"
@@ -163,7 +226,10 @@ export function EditExpenseModal({
             >
               Cancel
             </button>
-            <button className="button button-primary" disabled={saving}>
+            <button
+              className="button button-primary"
+              disabled={saving || deleting}
+            >
               <Save size={15} />
               {saving ? "Saving..." : "Save changes"}
             </button>
