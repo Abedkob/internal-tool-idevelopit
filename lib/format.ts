@@ -1,8 +1,8 @@
-export function money(value: number | string | null | undefined) {
+export function money(value: number | string | null | undefined, currency = "USD") {
   const amount = typeof value === "string" ? Number(value) : (value ?? 0);
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number.isFinite(amount) ? amount : 0);

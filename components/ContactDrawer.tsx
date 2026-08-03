@@ -142,6 +142,9 @@ export function ContactDrawer({
       whatsapp: contact.whatsapp,
       email: contact.email,
       location: contact.location,
+      billing_name: contact.billing_name,
+      billing_contact: contact.billing_contact,
+      billing_address: contact.billing_address,
       assigned_to: contact.assigned_to,
       notes: contact.notes,
     });
@@ -232,6 +235,9 @@ export function ContactDrawer({
         whatsapp: draft.whatsapp?.trim() || null,
         email: draft.email?.trim() || null,
         location: draft.location?.trim() || null,
+        billing_name: draft.billing_name?.trim() || null,
+        billing_contact: draft.billing_contact?.trim() || null,
+        billing_address: draft.billing_address?.trim() || null,
         notes: draft.notes?.trim() || null,
       }),
     );
@@ -441,6 +447,18 @@ export function ContactDrawer({
                       onChange={(event) => set("email", event.target.value)}
                     />
                   </div>
+                </label>
+                <label className="field span-2">
+                  <span>Billing name</span>
+                  <input value={draft.billing_name ?? ""} onChange={(event) => set("billing_name", event.target.value)} placeholder="Defaults to the contact name" />
+                </label>
+                <label className="field">
+                  <span>Billing contact</span>
+                  <input value={draft.billing_contact ?? ""} onChange={(event) => set("billing_contact", event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Billing address</span>
+                  <input value={draft.billing_address ?? ""} onChange={(event) => set("billing_address", event.target.value)} />
                 </label>
                 <label className="field span-2">
                   <span>Notes</span>

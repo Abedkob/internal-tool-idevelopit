@@ -13,6 +13,9 @@ const emptyForm: ContactInput = {
   whatsapp: "",
   email: "",
   location: "",
+  billing_name: "",
+  billing_contact: "",
+  billing_address: "",
   met_at: null,
   stage: "new",
   assigned_to: null,
@@ -53,6 +56,9 @@ export function NewContactModal({
         whatsapp: form.whatsapp?.trim() || null,
         email: form.email?.trim() || null,
         location: form.location?.trim() || null,
+        billing_name: form.billing_name?.trim() || null,
+        billing_contact: form.billing_contact?.trim() || null,
+        billing_address: form.billing_address?.trim() || null,
         notes: form.notes?.trim() || null,
       });
       onCreated(id);
@@ -164,6 +170,18 @@ export function NewContactModal({
                 onChange={(event) => set("location", event.target.value)}
                 placeholder="City or area"
               />
+            </label>
+            <label className="field span-2">
+              <span>Billing name</span>
+              <input value={form.billing_name ?? ""} onChange={(event) => set("billing_name", event.target.value)} placeholder="Optional company/name shown on invoices" />
+            </label>
+            <label className="field">
+              <span>Billing contact</span>
+              <input value={form.billing_contact ?? ""} onChange={(event) => set("billing_contact", event.target.value)} placeholder="Accounts contact" />
+            </label>
+            <label className="field">
+              <span>Billing address</span>
+              <input value={form.billing_address ?? ""} onChange={(event) => set("billing_address", event.target.value)} placeholder="Optional invoice address" />
             </label>
             <label className="field span-2">
               <span>Notes</span>

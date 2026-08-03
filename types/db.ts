@@ -16,6 +16,16 @@ export type PaymentStatus = "paid" | "pending";
 export type TaskPriority = "low" | "normal" | "high";
 export type TaskStatus = "open" | "done";
 export type AppRole = "member" | "superadmin";
+export type DocumentType = "invoice" | "contract" | "receipt";
+export type ContractStatus = "draft" | "active" | "paused" | "ended";
+export type InvoiceStatus =
+  | "draft"
+  | "sent"
+  | "partially_paid"
+  | "paid"
+  | "overdue"
+  | "cancelled";
+export type InvoicePaymentMethod = "cash" | "omt" | "whish";
 
 export type Profile = {
   id: string;
@@ -29,6 +39,9 @@ export type Service = {
   id: string;
   name: string;
   default_price: number;
+  description: string | null;
+  default_quantity: number;
+  active: boolean;
   created_at: string;
 };
 
@@ -61,6 +74,9 @@ export type Contact = {
   whatsapp: string | null;
   email: string | null;
   location: string | null;
+  billing_name: string | null;
+  billing_contact: string | null;
+  billing_address: string | null;
   met_at: string | null;
   stage: ContactStage;
   assigned_to: string | null;
@@ -80,6 +96,9 @@ export type ContactInput = Pick<
   | "whatsapp"
   | "email"
   | "location"
+  | "billing_name"
+  | "billing_contact"
+  | "billing_address"
   | "met_at"
   | "stage"
   | "assigned_to"
@@ -174,4 +193,133 @@ export type ExpenseSummary = {
     total: number;
     entries: number;
   }[];
+};
+
+export type AppSettings = {
+  id: 1;
+  company_name: string;
+  company_tagline: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  company_website: string | null;
+  logo_url: string | null;
+  stamp_url: string | null;
+  invoice_prefix: string;
+  next_invoice_number: number;
+  invoice_number_padding: number;
+  default_currency: string;
+  default_due_days: number;
+  default_terms: string | null;
+  default_footer: string;
+  default_payment_instructions: string | null;
+  cash_enabled: boolean;
+  omt_enabled: boolean;
+  omt_recipient_name: string | null;
+  omt_phone: string | null;
+  whish_enabled: boolean;
+  whish_recipient_name: string | null;
+  whish_phone: string | null;
+  updated_at: string;
+};
+
+export type TemplateConfig = {
+  paperSize: "A4";
+  orientation: "portrait" | "landscape";
+  primaryColor: string;
+  fontFamily: string;
+  logoWidth: number;
+  stampWidth: number;
+  sections: string[];
+  visibility: Record<string, boolean>;
+  labels: Record<string, string>;
+};
+
+export type DocumentTemplate = {
+  id: string;
+  name: string;
+  document_type: DocumentType;
+  is_default: boolean;
+  config: TemplateConfig;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BillingLineInput = {
+  service_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  sort_order: number;
+  service_period_start?: string | null;
+  service_period_end?: string | null;
+};
+
+export type ContractItem = BillingLineInput & { id: string; contract_id: string };
+export type ClientContract = {
+  id: string;
+  contact_id: string;
+  contract_number: string | null;
+  title: string;
+  start_date: string;
+  end_date: string | null;
+  billing_day: number;
+  due_days: number;
+  currency: string;
+  status: ContractStatus;
+  template_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  contact?: Pick<Contact, "id" | "name" | "billing_name">;
+  items?: ContractItem[];
+};
+
+export type InvoicePayment = {
+  id: string;
+  invoice_id: string;
+  amount: number;
+  payment_method: InvoicePaymentMethod;
+  paid_on: string;
+  transaction_reference: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type InvoiceItem = BillingLineInput & {
+  id: string;
+  invoice_id: string;
+  line_total: number;
+};
+
+export type Invoice = {
+  id: string;
+  invoice_number: string;
+  contact_id: string;
+  contract_id: string | null;
+  template_id: string | null;
+  status: InvoiceStatus;
+  invoice_date: string;
+  due_date: string;
+  service_period_start: string | null;
+  service_period_end: string | null;
+  currency: string;
+  contract_reference: string | null;
+  purchase_order_reference: string | null;
+  subtotal: number;
+  discount: number;
+  total_amount: number;
+  amount_paid: number;
+  balance_due: number;
+  notes: string | null;
+  terms: string | null;
+  payment_instructions: string | null;
+  company_snapshot: Record<string, unknown>;
+  client_snapshot: Record<string, unknown>;
+  template_snapshot: Record<string, unknown>;
+  finalized_at: string | null;
+  created_at: string;
+  contact?: Pick<Contact, "id" | "name" | "billing_name" | "billing_contact" | "billing_address" | "email" | "whatsapp">;
+  items?: InvoiceItem[];
+  invoice_payments?: InvoicePayment[];
+  template?: DocumentTemplate | null;
 };

@@ -26,7 +26,7 @@ import type {
 } from "@/types/db";
 
 const contactSummarySelect = `
-  id,name,instagram,whatsapp,email,location,met_at,stage,assigned_to,notes,created_by,created_at,last_touched_at,
+  id,name,instagram,whatsapp,email,location,billing_name,billing_contact,billing_address,met_at,stage,assigned_to,notes,created_by,created_at,last_touched_at,
   owner:profiles!contacts_assigned_to_fkey(id,name,color)
 `;
 const taskSelect =
@@ -294,6 +294,7 @@ export async function listServices(
   return (data ?? []).map((service) => ({
     ...service,
     default_price: Number(service.default_price),
+    default_quantity: Number(service.default_quantity),
   })) as Service[];
 }
 
@@ -655,13 +656,12 @@ async function assertUniqueName(
 
 export async function createService(
   supabase: SupabaseClient,
-  name: string,
-  defaultPrice: number,
+  input: Pick<Service, "name" | "description" | "default_quantity" | "default_price" | "active">,
 ) {
-  await assertUniqueName(supabase, "services", name);
+  await assertUniqueName(supabase, "services", input.name);
   const { error } = await supabase
     .from("services")
-    .insert({ name: name.trim(), default_price: defaultPrice });
+    .insert({ ...input, name: input.name.trim() });
   throwIfError(error);
   notifyDataChanged();
 }
@@ -669,26 +669,26 @@ export async function createService(
 export async function updateService(
   supabase: SupabaseClient,
   id: string,
-  name: string,
-  defaultPrice: number,
+  input: Pick<Service, "name" | "description" | "default_quantity" | "default_price" | "active">,
 ) {
-  await assertUniqueName(supabase, "services", name, id);
+  await assertUniqueName(supabase, "services", input.name, id);
   const { error } = await supabase
     .from("services")
-    .update({ name: name.trim(), default_price: defaultPrice })
+    .update({ ...input, name: input.name.trim() })
     .eq("id", id);
   throwIfError(error);
   notifyDataChanged();
 }
 
 export async function deleteService(supabase: SupabaseClient, id: string) {
-  const { count, error: countError } = await supabase
-    .from("payments")
-    .select("id", { count: "exact", head: true })
-    .eq("service_id", id);
-  throwIfError(countError);
-  if (count)
-    throw new Error("This service is used by a payment and cannot be deleted.");
+  const usages = await Promise.all(
+    ["payments", "contract_items", "invoice_items"].map((table) =>
+      supabase.from(table).select("id", { count: "exact", head: true }).eq("service_id", id),
+    ),
+  );
+  usages.forEach(({ error }) => throwIfError(error));
+  if (usages.some(({ count }) => Boolean(count)))
+    throw new Error("This service is already in financial history. Mark it inactive instead.");
   const { error } = await supabase.from("services").delete().eq("id", id);
   throwIfError(error);
   notifyDataChanged();

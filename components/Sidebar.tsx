@@ -9,6 +9,9 @@ import {
   Settings2,
   SlidersHorizontal,
   WalletCards,
+  FileText,
+  Repeat2,
+  PanelsTopLeft,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -26,6 +29,14 @@ const groups = [
       { href: "/pipeline", label: "Pipeline", icon: BarChart3 },
       { href: "/tasks", label: "Tasks", icon: CheckSquare2 },
       { href: "/expenses", label: "Expenses", icon: WalletCards },
+    ],
+  },
+  {
+    label: "Billing",
+    links: [
+      { href: "/contracts", label: "Contracts", icon: Repeat2 },
+      { href: "/invoices", label: "Invoices", icon: FileText },
+      { href: "/templates", label: "Templates", icon: PanelsTopLeft },
     ],
   },
   {
@@ -110,7 +121,7 @@ export function Sidebar({
           <div className="nav-group" key={group.label}>
             <p className="nav-label">{group.label}</p>
             {group.links.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href;
+              const active = pathname === href || pathname.startsWith(`${href}/`);
               const badge =
                 href === "/contacts"
                   ? badges.contacts
