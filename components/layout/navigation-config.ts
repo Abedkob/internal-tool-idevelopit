@@ -4,7 +4,9 @@ import {
   CheckSquare2,
   ContactRound,
   FileText,
+  Landmark,
   LayoutDashboard,
+  KeyRound,
   PanelsTopLeft,
   Repeat2,
   Settings2,
@@ -40,12 +42,14 @@ export const navigationGroups: NavigationGroup[] = [
     links: [
       { href: "/contracts", label: "Contracts", description: "Recurring agreements", icon: Repeat2 },
       { href: "/invoices", label: "Invoices", description: "Billing and receipts", icon: FileText },
+      { href: "/payments", label: "Payments", description: "Customer cashbook", icon: Landmark },
       { href: "/templates", label: "Templates", description: "Document system", icon: PanelsTopLeft },
     ],
   },
   {
     label: "System",
     links: [
+      { href: "/licensing", label: "Licensing", description: "Products and access", icon: KeyRound },
       { href: "/settings", label: "Settings", description: "Workspace controls", icon: Settings2 },
     ],
   },

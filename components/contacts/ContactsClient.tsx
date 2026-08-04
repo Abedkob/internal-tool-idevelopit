@@ -18,12 +18,11 @@ import {
   getContact,
   listContactsPage,
   listProfiles,
-  listServices,
 } from "@/lib/db";
 import { initials } from "@/lib/format";
 import { contactHeat } from "@/lib/heat";
 import { createClient } from "@/lib/supabase/client";
-import type { Contact, PagedResult, Profile, Service } from "@/types/db";
+import type { Contact, PagedResult, Profile } from "@/types/db";
 
 type Filter = "all" | "leads" | "customers";
 const emptyPage: PagedResult<Contact> = {
@@ -51,7 +50,6 @@ export function ContactsClient() {
 
   const [result, setResult] = useState<PagedResult<Contact>>(emptyPage);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
   const [selected, setSelected] = useState<Contact | null>(null);
   const [searchDraft, setSearchDraft] = useState(query);
   const [newOpen, setNewOpen] = useState(false);
@@ -109,10 +107,9 @@ export function ContactsClient() {
   }, [loadPage]);
   useEffect(() => {
     const supabase = createClient();
-    void Promise.all([listProfiles(supabase), listServices(supabase)])
-      .then(([profileData, serviceData]) => {
+    void listProfiles(supabase)
+      .then((profileData) => {
         setProfiles(profileData);
-        setServices(serviceData);
       })
       .catch((caught) =>
         setError(
@@ -382,7 +379,6 @@ export function ContactsClient() {
         <ContactDrawer
           contact={selected}
           profiles={profiles}
-          services={services}
           onClose={() => setSelected(null)}
           onChanged={refreshContact}
         />

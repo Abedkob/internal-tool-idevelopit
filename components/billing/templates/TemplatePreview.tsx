@@ -1,15 +1,21 @@
 import { Eye } from "lucide-react";
 import { DocumentWave } from "@/components/billing/shared/DocumentWave";
-import type { DocumentType, TemplateConfig } from "@/types/db";
+import type { AppSettings, DocumentType, TemplateConfig } from "@/types/db";
 
 type Props = {
   config: TemplateConfig;
   documentType: DocumentType;
   templateName: string;
+  appSettings: AppSettings | null;
+  logoUrl: string | null;
 };
 
-export function TemplatePreview({ config, documentType, templateName }: Props) {
+export function TemplatePreview({ config, documentType, templateName, appSettings, logoUrl }: Props) {
   const backgroundStyle = config.backgroundStyle ?? "clean";
+  const companyName = appSettings?.company_name?.trim() || "Company name";
+  const companyTagline = appSettings?.company_tagline?.trim() || "Company profile";
+  const companyWebsite = appSettings?.company_website?.trim() || "Website not configured";
+  const previewLogoWidth = Math.min(Math.max(config.logoWidth * 0.34, 42), 92);
 
   return (
     <aside className="template-preview-panel" aria-label="Live template preview">
@@ -40,8 +46,17 @@ export function TemplatePreview({ config, documentType, templateName }: Props) {
 
         <div className="preview-head">
           <div className="preview-brand-lockup">
-            <div className="preview-logo" style={{ width: Math.min(config.logoWidth, 140) }}>iD</div>
-            <span>iDevelopIt<br /><small>Digital studio</small></span>
+            {logoUrl ? (
+              <img
+                className="preview-logo-image"
+                src={logoUrl}
+                alt={`${companyName} logo`}
+                style={{ width: previewLogoWidth }}
+              />
+            ) : (
+              <span className="preview-logo-empty" style={{ width: previewLogoWidth }}>Logo not configured</span>
+            )}
+            <span>{companyName}<br /><small>{companyTagline}</small></span>
           </div>
           <div className="preview-document-id">
             <small>Billing document</small>
@@ -81,7 +96,7 @@ export function TemplatePreview({ config, documentType, templateName }: Props) {
         </div>
 
         <footer className="preview-footer">
-          <span>idevelopit.agency</span>
+          <span>{companyWebsite}</span>
           <span>{templateName || "Untitled template"}</span>
         </footer>
       </div>

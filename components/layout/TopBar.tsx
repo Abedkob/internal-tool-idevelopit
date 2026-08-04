@@ -11,6 +11,7 @@ const titles: Record<string, { title: string; description: string; section: stri
   "/expenses": { title: "Expenses", description: "Track where the team's money goes.", section: "Workspace" },
   "/contracts": { title: "Contracts", description: "Recurring agreements and billing schedules.", section: "Billing" },
   "/invoices": { title: "Invoices", description: "Billing documents, balances, and receipts.", section: "Billing" },
+  "/payments": { title: "Payments", description: "Customer-linked receipts and collection records.", section: "Billing" },
   "/templates": { title: "Templates", description: "Control the design of financial documents.", section: "Billing" },
   "/settings": { title: "Settings", description: "Shape services, categories, and workspace defaults.", section: "System" },
 };

@@ -2,6 +2,7 @@
 /node_modules_*
 /.next
 /out
+/tmp/
 /.env*.local
 *.tsbuildinfo
 npm-debug.log*

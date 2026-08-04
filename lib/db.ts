@@ -369,14 +369,24 @@ export async function getNavigationCounts(
 export async function getDashboardSummary(
   supabase: SupabaseClient,
 ): Promise<DashboardSummary> {
-  const { data, error } = await supabase.rpc("dashboard_summary");
-  throwIfError(error);
+  const [summaryResult, billingResult] = await Promise.all([
+    supabase.rpc("dashboard_summary"),
+    supabase
+      .from("invoice_balances")
+      .select("amount_paid,balance_due")
+      .not("finalized_at", "is", null)
+      .neq("status", "cancelled"),
+  ]);
+  throwIfError(summaryResult.error);
+  throwIfError(billingResult.error);
+  const data = summaryResult.data;
+  const billingRows = billingResult.data ?? [];
   return {
     need_attention: Number(data?.need_attention ?? 0),
     active_pipeline: Number(data?.active_pipeline ?? 0),
     negotiating: Number(data?.negotiating ?? 0),
-    collected: Number(data?.collected ?? 0),
-    pending: Number(data?.pending ?? 0),
+    collected: billingRows.reduce((sum, row) => sum + Number(row.amount_paid ?? 0), 0),
+    pending: billingRows.reduce((sum, row) => sum + Number(row.balance_due ?? 0), 0),
     spent: Number(data?.spent ?? 0),
     my_open_tasks: Number(data?.my_open_tasks ?? 0),
     pipeline_counts: data?.pipeline_counts ?? {},

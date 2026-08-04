@@ -23,9 +23,9 @@ import {
 } from "lucide-react";
 import { TemplateBackgroundPicker } from "@/components/billing/templates/TemplateBackgroundPicker";
 import { TemplatePreview } from "@/components/billing/templates/TemplatePreview";
-import { deleteTemplate, listTemplates, saveTemplate } from "@/lib/billing";
+import { deleteTemplate, getAppSettings, listTemplates, saveTemplate, signedAssetUrl } from "@/lib/billing";
 import { createClient } from "@/lib/supabase/client";
-import type { DocumentTemplate, DocumentType, TemplateConfig } from "@/types/db";
+import type { AppSettings, DocumentTemplate, DocumentType, TemplateConfig } from "@/types/db";
 
 const base: TemplateConfig = {
   paperSize: "A4",
@@ -101,16 +101,38 @@ function formatUpdatedAt(value: string) {
 export function TemplatesClient() {
   const [rows, setRows] = useState<DocumentTemplate[]>([]);
   const [selected, setSelected] = useState<DocumentTemplate>(draft());
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(true);
 
   const load = useCallback(async (selectId?: string) => {
     setBusy(true);
     try {
-      const data = await listTemplates(createClient());
+      const supabase = createClient();
+      const [templatesResult, settingsResult] = await Promise.allSettled([
+        listTemplates(supabase),
+        getAppSettings(supabase),
+      ]);
+
+      if (templatesResult.status === "rejected") throw templatesResult.reason;
+
+      const data = templatesResult.value;
       setRows(data);
       const found = selectId ? data.find((template) => template.id === selectId) : data[0];
       setSelected(found ?? draft());
+
+      if (settingsResult.status === "fulfilled") {
+        setAppSettings(settingsResult.value);
+        try {
+          setLogoUrl(await signedAssetUrl(supabase, settingsResult.value.logo_url));
+        } catch {
+          setLogoUrl(null);
+        }
+      } else {
+        setAppSettings(null);
+        setLogoUrl(null);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Templates could not load.");
     } finally {
@@ -317,7 +339,13 @@ export function TemplatesClient() {
           </footer>
         </section>
 
-        <TemplatePreview config={selected.config} documentType={selected.document_type} templateName={selected.name} />
+        <TemplatePreview
+          config={selected.config}
+          documentType={selected.document_type}
+          templateName={selected.name}
+          appSettings={appSettings}
+          logoUrl={logoUrl}
+        />
       </div>
     </div>
   );

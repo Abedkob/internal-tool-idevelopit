@@ -8,12 +8,11 @@ import {
   getContact,
   listPipelineContacts,
   listProfiles,
-  listServices,
 } from "@/lib/db";
 import { contactHeat } from "@/lib/heat";
 import { initials, relDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
-import type { Contact, ContactStage, Profile, Service } from "@/types/db";
+import type { Contact, ContactStage, Profile } from "@/types/db";
 
 const columns: { stage: ContactStage; label: string; cue: string }[] = [
   { stage: "new", label: "New", cue: "Not approached" },
@@ -46,7 +45,6 @@ export function PipelineClient() {
   const [mobileStage, setMobileStage] = useState<ContactStage>("new");
   const [mobileStageChosen, setMobileStageChosen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
   const [selected, setSelected] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
@@ -57,15 +55,13 @@ export function PipelineClient() {
     setError("");
     try {
       const supabase = createClient();
-      const [pipeline, profileData, serviceData] = await Promise.all([
+      const [pipeline, profileData] = await Promise.all([
         listPipelineContacts(supabase, limits),
         listProfiles(supabase),
-        listServices(supabase),
       ]);
       setGrouped(pipeline.rows);
       setTotals(pipeline.totals);
       setProfiles(profileData);
-      setServices(serviceData);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -233,7 +229,6 @@ export function PipelineClient() {
         <ContactDrawer
           contact={selected}
           profiles={profiles}
-          services={services}
           onClose={() => setSelected(null)}
           onChanged={refreshContact}
         />

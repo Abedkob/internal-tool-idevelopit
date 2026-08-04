@@ -20,14 +20,12 @@ import {
   listAttentionContacts,
   listMyOpenTasks,
   listProfiles,
-  listServices,
 } from "@/lib/db";
 import type {
   Contact,
   ContactStage,
   DashboardSummary,
   Profile,
-  Service,
   Task,
 } from "@/types/db";
 
@@ -55,7 +53,6 @@ export function DashboardClient() {
   const [attention, setAttention] = useState<Contact[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
   const [selected, setSelected] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -64,19 +61,17 @@ export function DashboardClient() {
     setError("");
     try {
       const supabase = createClient();
-      const [summaryData, attentionData, taskData, profileData, serviceData] =
+      const [summaryData, attentionData, taskData, profileData] =
         await Promise.all([
           getDashboardSummary(supabase),
           listAttentionContacts(supabase, 5),
           listMyOpenTasks(supabase, 5),
           listProfiles(supabase),
-          listServices(supabase),
         ]);
       setSummary(summaryData);
       setAttention(attentionData);
       setTasks(taskData);
       setProfiles(profileData);
-      setServices(serviceData);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -326,7 +321,6 @@ export function DashboardClient() {
         <ContactDrawer
           contact={selected}
           profiles={profiles}
-          services={services}
           onClose={() => setSelected(null)}
           onChanged={refreshContact}
         />

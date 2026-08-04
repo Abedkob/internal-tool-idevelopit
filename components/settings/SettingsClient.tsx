@@ -33,14 +33,12 @@ function ServiceRow({
   const [name, setName] = useState(service.name);
   const [price, setPrice] = useState(String(service.default_price));
   const [description, setDescription] = useState(service.description ?? "");
-  const [quantity, setQuantity] = useState(String(service.default_quantity));
   const [active, setActive] = useState(service.active);
   const [busy, setBusy] = useState(false);
   async function save(event: FormEvent) {
     event.preventDefault();
     const numeric = Number(price);
-    const numericQuantity = Number(quantity);
-    if (!name.trim() || !Number.isFinite(numeric) || numeric < 0 || !Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+    if (!name.trim() || !Number.isFinite(numeric) || numeric < 0) {
       onError("Enter a service name and valid default price.");
       return;
     }
@@ -50,7 +48,7 @@ function ServiceRow({
         name,
         default_price: numeric,
         description: description.trim() || null,
-        default_quantity: numericQuantity,
+        default_quantity: 1,
         active,
       });
       setEditing(false);
@@ -89,6 +87,7 @@ function ServiceRow({
       {editing ? (
         <form className="settings-inline-edit" onSubmit={save}>
           <input
+            className="service-name-input"
             value={name}
             onChange={(event) => setName(event.target.value)}
             aria-label="Service name"
@@ -106,9 +105,8 @@ function ServiceRow({
               required
             />
           </div>
-          <input value={description} onChange={(event)=>setDescription(event.target.value)} aria-label="Service description" placeholder="Default description" />
-          <input type="number" min="0.01" step="0.01" value={quantity} onChange={(event)=>setQuantity(event.target.value)} aria-label="Default quantity" />
-          <label className="check-row"><input type="checkbox" checked={active} onChange={(event)=>setActive(event.target.checked)}/> Active</label>
+          <input className="service-description-input" value={description} onChange={(event)=>setDescription(event.target.value)} aria-label="Service description" placeholder="Default description" />
+          <label className="check-row service-active-control"><input type="checkbox" checked={active} onChange={(event)=>setActive(event.target.checked)}/> Active</label>
           <button
             className="icon-button save-action"
             disabled={busy}
@@ -118,7 +116,7 @@ function ServiceRow({
           </button>
           <button
             type="button"
-            className="icon-button"
+            className="icon-button service-cancel-action"
             onClick={() => setEditing(false)}
             aria-label="Cancel"
           >
@@ -129,7 +127,7 @@ function ServiceRow({
         <>
           <div className="settings-row-copy">
             <strong>{service.name}</strong>
-            <small>{service.active ? "Active" : "Inactive"} · Qty {service.default_quantity}{service.description ? ` · ${service.description}` : ""}</small>
+            <small>{service.active ? "Active" : "Inactive"}{service.description ? ` · ${service.description}` : ""}</small>
           </div>
           <span className="settings-value">{money(service.default_price)}</span>
           <div className="settings-row-actions">
@@ -277,7 +275,6 @@ export function SettingsClient() {
   const [serviceName, setServiceName] = useState("");
   const [servicePrice, setServicePrice] = useState("");
   const [serviceDescription, setServiceDescription] = useState("");
-  const [serviceQuantity, setServiceQuantity] = useState("1");
   const [categoryName, setCategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState("");
   const [loading, setLoading] = useState(true);
@@ -311,8 +308,7 @@ export function SettingsClient() {
   async function addService(event: FormEvent) {
     event.preventDefault();
     const price = Number(servicePrice);
-    const quantity = Number(serviceQuantity);
-    if (!serviceName.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(quantity) || quantity <= 0) {
+    if (!serviceName.trim() || !Number.isFinite(price) || price < 0) {
       setError("Enter a service name and valid default price.");
       return;
     }
@@ -323,13 +319,12 @@ export function SettingsClient() {
         name: serviceName,
         default_price: price,
         description: serviceDescription.trim() || null,
-        default_quantity: quantity,
+        default_quantity: 1,
         active: true,
       });
       setServiceName("");
       setServicePrice("");
       setServiceDescription("");
-      setServiceQuantity("1");
       setNotice("Service added.");
       await load();
     } catch (caught) {
@@ -429,7 +424,6 @@ export function SettingsClient() {
               />
             </div>
             <input value={serviceDescription} onChange={(event)=>setServiceDescription(event.target.value)} placeholder="Default description" aria-label="Default description" />
-            <input type="number" min="0.01" step="0.01" value={serviceQuantity} onChange={(event)=>setServiceQuantity(event.target.value)} placeholder="Quantity" aria-label="Default quantity" />
             <button className="button button-primary" disabled={saving}>
               <Plus size={14} />
               Add

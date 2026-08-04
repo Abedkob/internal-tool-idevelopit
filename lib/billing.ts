@@ -5,11 +5,18 @@ import type {
   ClientContract,
   DocumentTemplate,
   Invoice,
+  InvoicePaymentRecord,
   InvoicePaymentMethod,
 } from "@/types/db";
 
 function fail(error: { message: string } | null) {
   if (error) throw new Error(error.message);
+}
+
+function notifyBillingChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("idevelopit-vault:billing-changed"));
+  window.dispatchEvent(new Event("idevelopit-vault:data-changed"));
 }
 
 const contractSelect = "*,contact:contacts(id,name,billing_name),items:contract_items(*)";
@@ -90,22 +97,26 @@ export async function saveContract(supabase: SupabaseClient, contract: Record<st
 export async function createInvoice(supabase: SupabaseClient, invoice: Record<string, unknown>, items: BillingLineInput[]) {
   const { data, error } = await supabase.rpc("create_invoice", { p_invoice: invoice, p_items: items });
   fail(error);
+  notifyBillingChanged();
   return data as string;
 }
 
 export async function updateInvoice(supabase: SupabaseClient, id: string, invoice: Record<string, unknown>, items: BillingLineInput[]) {
   const { error } = await supabase.rpc("admin_update_invoice", { p_invoice_id: id, p_invoice: invoice, p_items: items });
   fail(error);
+  notifyBillingChanged();
 }
 
 export async function deleteInvoice(supabase: SupabaseClient, id: string) {
   const { error } = await supabase.rpc("delete_invoice", { p_invoice_id: id });
   fail(error);
+  notifyBillingChanged();
 }
 
 export async function cancelInvoice(supabase: SupabaseClient, id: string) {
   const { error } = await supabase.rpc("cancel_invoice", { p_invoice_id: id });
   fail(error);
+  notifyBillingChanged();
 }
 
 export async function createInvoiceFromContract(supabase: SupabaseClient, contractId: string, start: string, end: string) {
@@ -142,6 +153,7 @@ export async function getInvoice(supabase: SupabaseClient, id: string) {
 export async function finalizeInvoice(supabase: SupabaseClient, id: string) {
   const { error } = await supabase.rpc("finalize_invoice", { p_invoice_id: id });
   fail(error);
+  notifyBillingChanged();
 }
 
 export async function recordInvoicePayment(supabase: SupabaseClient, input: {
@@ -154,4 +166,47 @@ export async function recordInvoicePayment(supabase: SupabaseClient, input: {
     p_notes: input.notes || null,
   });
   fail(error);
+  notifyBillingChanged();
+}
+
+export async function listContactInvoiceLedger(supabase: SupabaseClient, contactId: string) {
+  const { data, error } = await supabase
+    .from("invoice_balances")
+    .select("*,invoice_payments(*)")
+    .eq("contact_id", contactId)
+    .not("finalized_at", "is", null)
+    .order("invoice_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
+  fail(error);
+  return (data ?? []).map((row: any) => ({
+    ...numbers(row, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]),
+    invoice_payments: (row.invoice_payments ?? []).map((payment: any) => numbers(payment, ["amount"])),
+  })) as Invoice[];
+}
+
+export async function listInvoicePaymentRecords(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("invoice_payments")
+    .select(`*,invoice:invoices!inner(
+      id,invoice_number,contact_id,status,currency,total_amount,
+      contact:contacts!inner(id,name,billing_name,email,whatsapp)
+    )`)
+    .order("paid_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(500);
+  fail(error);
+  return (data ?? []).map((row: any) => numbers(row, ["amount"])) as InvoicePaymentRecord[];
+}
+
+export async function listPaymentInvoices(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("invoice_balances")
+    .select("*,contact:contacts(id,name,billing_name,billing_contact,billing_address,email,whatsapp)")
+    .order("invoice_date", { ascending: false })
+    .limit(500);
+  fail(error);
+  return (data ?? []).map((row: any) =>
+    numbers(row, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]),
+  ) as Invoice[];
 }

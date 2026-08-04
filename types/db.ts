@@ -26,6 +26,20 @@ export type InvoiceStatus =
   | "overdue"
   | "cancelled";
 export type InvoicePaymentMethod = "cash" | "omt" | "whish";
+export type LicenseType = "trial" | "subscription" | "perpetual";
+export type LicenseStatus = "active" | "suspended" | "revoked";
+export type LicenseEffectiveStatus = LicenseStatus | "scheduled" | "expired";
+export type LicenseEventType =
+  | "issued"
+  | "updated"
+  | "activated"
+  | "validated"
+  | "deactivated"
+  | "activation_reset"
+  | "suspended"
+  | "reactivated"
+  | "revoked"
+  | "rejected";
 
 export type Profile = {
   id: string;
@@ -288,6 +302,15 @@ export type InvoicePayment = {
   created_at: string;
 };
 
+export type InvoicePaymentRecord = InvoicePayment & {
+  invoice: Pick<
+    Invoice,
+    "id" | "invoice_number" | "contact_id" | "status" | "currency" | "total_amount"
+  > & {
+    contact: Pick<Contact, "id" | "name" | "billing_name" | "email" | "whatsapp">;
+  };
+};
+
 export type InvoiceItem = BillingLineInput & {
   id: string;
   invoice_id: string;
@@ -326,3 +349,82 @@ export type Invoice = {
   invoice_payments?: InvoicePayment[];
   template?: DocumentTemplate | null;
 };
+
+export type LicensedProduct = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  default_max_activations: number;
+  default_offline_grace_days: number;
+  default_validation_hours: number;
+  default_entitlements: Record<string, unknown>;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LicenseActivation = {
+  id: string;
+  license_id: string;
+  installation_hash: string;
+  device_label: string | null;
+  platform: string | null;
+  application_version: string | null;
+  first_activated_at: string;
+  last_seen_at: string;
+  deactivated_at: string | null;
+  deactivated_reason: string | null;
+  created_at: string;
+};
+
+export type LicenseEvent = {
+  id: number;
+  license_id: string | null;
+  activation_id: string | null;
+  contact_id: string | null;
+  event_type: LicenseEventType;
+  result_code: string;
+  actor_id: string | null;
+  request_id: string | null;
+  metadata: Record<string, unknown>;
+  occurred_at: string;
+};
+
+export type LicenseInvoiceSummary = Pick<
+  Invoice,
+  "id" | "invoice_number" | "status" | "currency" | "total_amount" | "amount_paid" | "balance_due"
+>;
+
+export type License = {
+  id: string;
+  contact_id: string;
+  product_id: string;
+  source_invoice_id: string | null;
+  source_contract_id: string | null;
+  key_prefix: string;
+  key_last_four: string;
+  license_type: LicenseType;
+  status: LicenseStatus;
+  effective_status: LicenseEffectiveStatus;
+  starts_at: string;
+  expires_at: string | null;
+  max_activations: number;
+  active_activations: number;
+  total_activations: number;
+  offline_grace_days: number;
+  validation_hours: number;
+  entitlements: Record<string, unknown>;
+  internal_notes: string | null;
+  token_version: number;
+  last_seen_at: string | null;
+  created_at: string;
+  updated_at: string;
+  contact: Pick<Contact, "id" | "name" | "billing_name" | "email" | "whatsapp">;
+  product: Pick<LicensedProduct, "id" | "code" | "name" | "description" | "active">;
+  source_invoice: LicenseInvoiceSummary | null;
+  activations?: LicenseActivation[];
+  events?: LicenseEvent[];
+};
+
+export type IssuedLicense = { license_id: string; license_key: string };

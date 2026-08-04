@@ -1,10 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowUpRight,
   AtSign,
   Check,
+  CircleDollarSign,
   ExternalLink,
+  FileText,
+  KeyRound,
+  Laptop,
   Mail,
   MapPin,
   MessageCircle,
@@ -15,13 +21,12 @@ import {
 } from "lucide-react";
 import {
   addActivity,
-  addPayment,
-  getContactPaymentSummary,
   listContactActivities,
-  listContactPayments,
   moveContact,
   updateContact,
 } from "@/lib/db";
+import { listContactInvoiceLedger } from "@/lib/billing";
+import { listContactLicenses, maskedLicenseKey } from "@/lib/licensing";
 import { createClient } from "@/lib/supabase/client";
 import { fmtDay, initials, money } from "@/lib/format";
 import { HeatChip } from "@/components/contacts/HeatChip";
@@ -32,10 +37,9 @@ import type {
   ContactStage,
   ContactUpdate,
   Cursor,
-  Payment,
-  PaymentStatus,
+  Invoice,
+  License,
   Profile,
-  Service,
 } from "@/types/db";
 import { useDialogFocus } from "@/lib/useDialogFocus";
 
@@ -77,13 +81,11 @@ function emailHref(value: string | null) {
 export function ContactDrawer({
   contact,
   profiles,
-  services,
   onClose,
   onChanged,
 }: {
   contact: Contact;
   profiles: Profile[];
-  services: Service[];
   onClose: () => void;
   onChanged: (id: string) => Promise<void>;
 }) {
@@ -92,38 +94,26 @@ export function ContactDrawer({
   const [error, setError] = useState("");
   const [channel, setChannel] = useState<ActivityChannel>("whatsapp");
   const [activityNote, setActivityNote] = useState("");
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [amount, setAmount] = useState(
-    services[0]?.default_price?.toString() ?? "",
-  );
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pending");
-  const [customDescription, setCustomDescription] = useState("");
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [licenses, setLicenses] = useState<License[]>([]);
   const [activityCursor, setActivityCursor] = useState<Cursor | null>(null);
-  const [paymentCursor, setPaymentCursor] = useState<Cursor | null>(null);
   const [loadingFeed, setLoadingFeed] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [paymentSummary, setPaymentSummary] = useState({
-    collected: 0,
-    pending: 0,
-    entries: 0,
-  });
 
   const loadFeeds = useCallback(async () => {
     setLoadingFeed(true);
     try {
       const supabase = createClient();
-      const [activityPage, paymentPage, summary] = await Promise.all([
+      const [activityPage, invoiceRows, licenseRows] = await Promise.all([
         listContactActivities(supabase, contact.id),
-        listContactPayments(supabase, contact.id),
-        getContactPaymentSummary(supabase, contact.id),
+        listContactInvoiceLedger(supabase, contact.id),
+        listContactLicenses(supabase, contact.id),
       ]);
       setActivities(activityPage.rows);
       setActivityCursor(activityPage.nextCursor);
-      setPayments(paymentPage.rows);
-      setPaymentCursor(paymentPage.nextCursor);
-      setPaymentSummary(summary);
+      setInvoices(invoiceRows);
+      setLicenses(licenseRows);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -152,6 +142,11 @@ export function ContactDrawer({
   useEffect(() => {
     void loadFeeds();
   }, [loadFeeds]);
+  useEffect(() => {
+    const refreshBilling = () => void loadFeeds();
+    window.addEventListener("idevelopit-vault:billing-changed", refreshBilling);
+    return () => window.removeEventListener("idevelopit-vault:billing-changed", refreshBilling);
+  }, [loadFeeds]);
   const dialogRef = useDialogFocus<HTMLElement>(onClose);
 
   const links = useMemo(
@@ -162,6 +157,12 @@ export function ContactDrawer({
     }),
     [contact],
   );
+  const paymentSummary = useMemo(() => ({
+    billed: invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0),
+    collected: invoices.reduce((sum, invoice) => sum + invoice.amount_paid, 0),
+    pending: invoices.reduce((sum, invoice) => sum + invoice.balance_due, 0),
+    receipts: invoices.reduce((sum, invoice) => sum + (invoice.invoice_payments?.length ?? 0), 0),
+  }), [invoices]);
   function set<K extends keyof ContactUpdate>(key: K, value: ContactUpdate[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
@@ -204,27 +205,6 @@ export function ContactDrawer({
       setLoadingMore(false);
     }
   }
-  async function loadMorePayments() {
-    if (!paymentCursor) return;
-    setLoadingMore(true);
-    try {
-      const next = await listContactPayments(
-        createClient(),
-        contact.id,
-        paymentCursor,
-      );
-      setPayments((current) => [...current, ...next.rows]);
-      setPaymentCursor(next.nextCursor);
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "More payments could not be loaded.",
-      );
-    } finally {
-      setLoadingMore(false);
-    }
-  }
   async function saveDetails(event: FormEvent) {
     event.preventDefault();
     await run(() =>
@@ -257,33 +237,6 @@ export function ContactDrawer({
         activityNote.trim(),
       );
       setActivityNote("");
-    });
-  }
-  function chooseService(id: string) {
-    setServiceId(id);
-    const service = services.find((item) => item.id === id);
-    if (service) setAmount(String(service.default_price));
-  }
-  async function logPayment(event: FormEvent) {
-    event.preventDefault();
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setError("Enter a valid payment amount.");
-      return;
-    }
-    await run(async () => {
-      await addPayment(createClient(), {
-        contact_id: contact.id,
-        service_id: serviceId || null,
-        custom_description: serviceId ? null : customDescription.trim() || null,
-        amount: numericAmount,
-        status: paymentStatus,
-        paid_on:
-          paymentStatus === "paid"
-            ? new Date().toISOString().slice(0, 10)
-            : null,
-      });
-      setCustomDescription("");
     });
   }
 
@@ -480,115 +433,57 @@ export function ContactDrawer({
           </section>
 
           {contact.stage === "customer" && (
-            <section className="drawer-section">
+            <section className="drawer-section contact-billing-ledger">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">Commercial</p>
-                  <h3>Payments</h3>
+                  <p className="eyebrow">Connected billing</p>
+                  <h3>Invoices &amp; payments</h3>
                 </div>
-                <span className="section-total">
-                  {money(paymentSummary.collected)} collected
-                </span>
+                <Link href="/payments" className="contact-ledger-link">Payment ledger <ArrowUpRight size={12} /></Link>
               </div>
-              <div className="payment-list">
-                {payments.length ? (
-                  payments.map((payment) => (
-                    <div className="payment-row" key={payment.id}>
-                      <div>
-                        <strong>
-                          {payment.service?.name ??
-                            payment.custom_description ??
-                            "Custom service"}
-                        </strong>
-                        <small>
-                          {fmtDay(payment.paid_on ?? payment.created_at)}
-                        </small>
-                      </div>
-                      <div>
-                        <strong>{money(payment.amount)}</strong>
-                        <span
-                          className={`status-pill status-${payment.status}`}
-                        >
-                          {payment.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="empty-inline">No payments logged yet.</p>
-                )}
+              <div className="contact-ledger-summary" aria-label="Customer billing summary">
+                <div><span><FileText size={13} /></span><small>Billed</small><strong>{money(paymentSummary.billed, invoices[0]?.currency)}</strong></div>
+                <div><span><Check size={13} /></span><small>Collected</small><strong>{money(paymentSummary.collected, invoices[0]?.currency)}</strong></div>
+                <div className={paymentSummary.pending > 0 ? "has-balance" : ""}><span><CircleDollarSign size={13} /></span><small>Outstanding</small><strong>{money(paymentSummary.pending, invoices[0]?.currency)}</strong></div>
               </div>
-              {paymentCursor && (
-                <button
-                  className="load-more"
-                  onClick={loadMorePayments}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? (
-                    <LoaderCircle size={14} className="spin-icon" />
-                  ) : (
-                    <Plus size={14} />
-                  )}{" "}
-                  Load more payments
-                </button>
-              )}
-              <form className="inline-form payment-form" onSubmit={logPayment}>
-                <label className="field">
-                  <span>Service</span>
-                  <select
-                    value={serviceId}
-                    onChange={(event) => chooseService(event.target.value)}
-                  >
-                    <option value="">Custom</option>
-                    {services.map((service) => (
-                      <option key={service.id} value={service.id}>
-                        {service.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {!serviceId && (
-                  <label className="field">
-                    <span>Description</span>
-                    <input
-                      value={customDescription}
-                      onChange={(event) =>
-                        setCustomDescription(event.target.value)
-                      }
-                      required
-                    />
-                  </label>
-                )}
-                <label className="field">
-                  <span>Amount</span>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                    required
-                  />
-                </label>
-                <label className="field">
-                  <span>Status</span>
-                  <select
-                    value={paymentStatus}
-                    onChange={(event) =>
-                      setPaymentStatus(event.target.value as PaymentStatus)
-                    }
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                  </select>
-                </label>
-                <button className="button button-secondary" disabled={saving}>
-                  <Plus size={15} />
-                  Add
-                </button>
-              </form>
+              <div className="contact-invoice-list">
+                {invoices.length ? invoices.map((invoice) => {
+                  const progress = invoice.total_amount > 0 ? Math.min(100, Math.round(invoice.amount_paid / invoice.total_amount * 100)) : 0;
+                  return <Link href={`/invoices/${invoice.id}`} className="contact-invoice-row" key={invoice.id}>
+                    <span className="contact-invoice-mark"><FileText size={14} /></span>
+                    <span className="contact-invoice-copy"><strong>{invoice.invoice_number}</strong><small>Issued {fmtDay(invoice.invoice_date)} · {invoice.invoice_payments?.length ?? 0} receipt{invoice.invoice_payments?.length === 1 ? "" : "s"}</small><span className="contact-invoice-progress"><i style={{ width: `${progress}%` }} /></span></span>
+                    <span className="contact-invoice-balance"><strong>{invoice.balance_due > 0 ? money(invoice.balance_due, invoice.currency) : money(invoice.total_amount, invoice.currency)}</strong><small>{invoice.balance_due > 0 ? "outstanding" : "collected"}</small><em className={`status-pill status-${invoice.status}`}>{invoice.status.replace("_", " ")}</em></span>
+                    <ArrowUpRight size={13} />
+                  </Link>;
+                }) : <div className="contact-ledger-empty"><FileText size={18} /><div><strong>No finalized invoices</strong><p>Finalize this customer&apos;s first invoice and it will appear here automatically.</p></div></div>}
+              </div>
             </section>
           )}
+
+          <section className="drawer-section contact-license-ledger">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Product access</p>
+                <h3>Licenses &amp; activations</h3>
+              </div>
+              <Link href="/licensing" className="contact-ledger-link">License registry <ArrowUpRight size={12} /></Link>
+            </div>
+            <div className="contact-license-summary">
+              <div><span><KeyRound size={13} /></span><small>Licenses</small><strong>{licenses.length}</strong></div>
+              <div><span><Laptop size={13} /></span><small>Activations</small><strong>{licenses.reduce((sum, license) => sum + license.active_activations, 0)}</strong></div>
+              <div><span><Check size={13} /></span><small>Active</small><strong>{licenses.filter((license) => license.effective_status === "active").length}</strong></div>
+            </div>
+            <div className="contact-license-list">
+              {licenses.length ? licenses.map((license) => (
+                <Link href={`/licensing?license=${license.id}`} className="contact-license-row" key={license.id}>
+                  <span className="contact-license-mark"><KeyRound size={14} /></span>
+                  <span className="contact-license-copy"><strong>{license.product.name}</strong><code>{maskedLicenseKey(license)}</code><small>{license.source_invoice ? `Linked to ${license.source_invoice.invoice_number}` : "Direct entitlement"}</small></span>
+                  <span className="contact-license-capacity"><strong>{license.active_activations}/{license.max_activations}</strong><small>activations</small><em className={`license-state license-state-${license.effective_status}`}><i />{license.effective_status}</em></span>
+                  <ArrowUpRight size={13} />
+                </Link>
+              )) : <div className="contact-ledger-empty"><KeyRound size={18} /><div><strong>No licenses issued</strong><p>Issue this customer&apos;s first product entitlement from the license registry.</p></div></div>}
+            </div>
+          </section>
 
           <section className="drawer-section activity-section">
             <div className="section-heading">

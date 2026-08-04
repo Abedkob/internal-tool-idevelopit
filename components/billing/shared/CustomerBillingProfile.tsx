@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CheckCircle2, Mail, MapPin, Phone, UserRound } from "lucide-react";
+import { BadgeCheck, Building2, Fingerprint, Mail, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
 import type { Contact } from "@/types/db";
 
 export type CustomerBillingValue = {
@@ -29,17 +29,41 @@ export function CustomerBillingProfile({ contact, value, onChange }: {
   onChange: (value: CustomerBillingValue) => void;
 }) {
   const filled = Object.values(value).filter((entry) => entry.trim()).length;
+  const completeness = filled * 20;
   const set = (key: keyof CustomerBillingValue, next: string) => onChange({ ...value, [key]: next });
-  if (!contact) return <aside className="billing-passport billing-passport-empty"><Building2 size={24}/><strong>Choose a customer</strong><p>Their saved billing profile will appear here automatically.</p></aside>;
-  return <aside className="billing-passport">
-    <header><div><p className="eyebrow">Billing passport</p><h3>{value.billing_name || contact.name}</h3></div><span className="passport-score"><CheckCircle2 size={13}/>{filled}/5</span></header>
-    <p className="passport-note">Changes made here update the customer record when you save.</p>
-    <div className="passport-fields">
-      <label><Building2 size={14}/><span><small>Invoice name</small><input value={value.billing_name} onChange={e=>set("billing_name",e.target.value)} placeholder={contact.name}/></span></label>
-      <label><UserRound size={14}/><span><small>Contact person</small><input value={value.billing_contact} onChange={e=>set("billing_contact",e.target.value)} placeholder="Optional"/></span></label>
-      <label><MapPin size={14}/><span><small>Billing address</small><textarea rows={2} value={value.billing_address} onChange={e=>set("billing_address",e.target.value)} placeholder="Optional"/></span></label>
-      <label><Mail size={14}/><span><small>Email</small><input type="email" value={value.email} onChange={e=>set("email",e.target.value)} placeholder="Optional"/></span></label>
-      <label><Phone size={14}/><span><small>WhatsApp</small><input value={value.whatsapp} onChange={e=>set("whatsapp",e.target.value)} placeholder="Optional"/></span></label>
-    </div>
-  </aside>;
+  if (!contact) return (
+    <aside className="billing-passport billing-passport-empty">
+      <span className="passport-empty-mark"><Fingerprint size={25} /></span>
+      <div><p className="eyebrow">Billing passport</p><strong>Choose a customer</strong><p>Their saved invoice identity and contact details will load here.</p></div>
+    </aside>
+  );
+
+  return (
+    <aside className="billing-passport">
+      <header className="passport-identity">
+        <span className="passport-monogram" aria-hidden="true">{(value.billing_name || contact.name).trim().slice(0, 2).toUpperCase()}</span>
+        <div className="passport-title">
+          <p className="eyebrow"><Fingerprint size={11} /> Customer billing identity</p>
+          <h3>{value.billing_name || contact.name}</h3>
+          <span>ID · {contact.id.slice(0, 8).toUpperCase()}</span>
+        </div>
+        <span className="passport-verified" title="Linked customer record"><BadgeCheck size={16} /></span>
+      </header>
+
+      <div className="passport-completeness">
+        <span><strong>{completeness}% complete</strong><small>{filled} of 5 billing fields</small></span>
+        <span className="passport-progress" aria-label={`${completeness}% complete`}><i style={{ width: `${completeness}%` }} /></span>
+      </div>
+
+      <div className="passport-fields">
+        <label><span className="passport-field-icon"><Building2 size={14}/></span><span><small>Invoice name</small><input value={value.billing_name} onChange={e=>set("billing_name",e.target.value)} placeholder={contact.name}/></span></label>
+        <label><span className="passport-field-icon"><UserRound size={14}/></span><span><small>Contact person</small><input value={value.billing_contact} onChange={e=>set("billing_contact",e.target.value)} placeholder="Optional"/></span></label>
+        <label className="passport-address-field"><span className="passport-field-icon"><MapPin size={14}/></span><span><small>Billing address</small><textarea rows={2} value={value.billing_address} onChange={e=>set("billing_address",e.target.value)} placeholder="Optional"/></span></label>
+        <label><span className="passport-field-icon"><Mail size={14}/></span><span><small>Billing email</small><input type="email" value={value.email} onChange={e=>set("email",e.target.value)} placeholder="Optional"/></span></label>
+        <label><span className="passport-field-icon"><Phone size={14}/></span><span><small>WhatsApp</small><input value={value.whatsapp} onChange={e=>set("whatsapp",e.target.value)} placeholder="Optional"/></span></label>
+      </div>
+
+      <footer className="passport-sync-note"><ShieldCheck size={13}/><span><strong>Synced customer profile</strong><small>Saving this document updates the customer record.</small></span></footer>
+    </aside>
+  );
 }
