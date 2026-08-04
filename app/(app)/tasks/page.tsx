@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { TasksClient } from "@/components/TasksClient";
+import { TasksClient } from "@/components/tasks/TasksClient";
 export const metadata = { title: "Tasks" };
 export default function TasksPage() {
   return (

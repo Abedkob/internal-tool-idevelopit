@@ -93,8 +93,13 @@ export async function createInvoice(supabase: SupabaseClient, invoice: Record<st
   return data as string;
 }
 
-export async function updateDraftInvoice(supabase: SupabaseClient, id: string, invoice: Record<string, unknown>, items: BillingLineInput[]) {
-  const { error } = await supabase.rpc("update_draft_invoice", { p_invoice_id: id, p_invoice: invoice, p_items: items });
+export async function updateInvoice(supabase: SupabaseClient, id: string, invoice: Record<string, unknown>, items: BillingLineInput[]) {
+  const { error } = await supabase.rpc("admin_update_invoice", { p_invoice_id: id, p_invoice: invoice, p_items: items });
+  fail(error);
+}
+
+export async function deleteInvoice(supabase: SupabaseClient, id: string) {
+  const { error } = await supabase.rpc("delete_invoice", { p_invoice_id: id });
   fail(error);
 }
 

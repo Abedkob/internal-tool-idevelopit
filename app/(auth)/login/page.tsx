@@ -1,8 +1,18 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, LockKeyhole } from "lucide-react";
+import {
+  ArrowUpRight,
+  CircleAlert,
+  Eye,
+  EyeOff,
+  KeyRound,
+  LoaderCircle,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
+import { DocumentWave } from "@/components/billing/shared/DocumentWave";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 
@@ -11,104 +21,154 @@ export default function LoginPage() {
   const configured = hasSupabaseConfig();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!configured) return;
+    if (!configured || loading) return;
+
     setError("");
     setLoading(true);
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    setLoading(false);
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
     if (signInError) {
+      setLoading(false);
       setError(signInError.message);
       return;
     }
+
     router.replace("/dashboard");
     router.refresh();
   }
 
   return (
     <main className="login-page">
-      <section className="login-context" aria-label="Team Console introduction">
+      <DocumentWave className="login-ambient-wave" />
+
+      <header className="login-topbar">
         <div className="login-brand">
-          <span className="brand-mark">TC</span> Team Console
+          <span className="brand-logo-frame login-logo-frame" aria-hidden="true">
+            <img src="/idevelopit-vault-logo.jpeg" alt="" />
+          </span>
+          <span className="login-brand-copy">
+            <strong>idevelopit-vault</strong>
+            <small>Internal operations</small>
+          </span>
         </div>
-        <div className="login-copy">
-          <p className="eyebrow">Private workspace</p>
-          <h1>
-            Keep the work
-            <br />
-            within reach.
-          </h1>
-          <p>
-            Pipeline, client touchpoints, tasks, and spending—organized for a
-            team of three.
-          </p>
-        </div>
-        <p className="login-footnote">One shared source of truth.</p>
-      </section>
 
-      <section className="login-panel">
-        <form className="login-form" onSubmit={signIn}>
-          <div className="login-lock" aria-hidden="true">
-            <LockKeyhole size={21} />
+        <div className="login-system-status">
+          <i aria-hidden="true" />
+          <span><strong>Private workspace</strong><small>Authorized access only</small></span>
+        </div>
+      </header>
+
+      <div className="login-stage">
+        <section className="login-context" aria-label="Workspace introduction">
+          <div className="login-coordinate"><span>01</span><i /> Workspace access</div>
+          <div className="login-copy">
+            <p className="eyebrow">The operating layer for iDevelopIt</p>
+            <h1>One place for<br /><em>the whole operation.</em></h1>
+            <p>Client relationships, delivery, billing, and team priorities—connected in one private view.</p>
           </div>
-          <p className="eyebrow">Team access</p>
-          <h2>Sign in</h2>
-          <p className="form-intro">
-            Use the email and password connected to your workspace.
-          </p>
 
-          {!configured && (
-            <div className="notice" role="status">
-              Add your Supabase URL and anon key to <code>.env.local</code> to
-              enable sign-in.
+          <div className="login-workspace-map" aria-label="Workspace areas">
+            <span><small>01</small><strong>Relationships</strong><em>Contacts and pipeline</em></span>
+            <span><small>02</small><strong>Delivery</strong><em>Tasks and contracts</em></span>
+            <span><small>03</small><strong>Finance</strong><em>Invoices and expenses</em></span>
+          </div>
+        </section>
+
+        <section className="login-panel" aria-label="Sign in">
+          <form className="login-form" onSubmit={signIn} noValidate>
+            <header className="login-form-header">
+              <div className="login-lock" aria-hidden="true"><KeyRound size={19} /></div>
+              <div>
+                <p className="eyebrow">Authenticated access</p>
+                <h2>Enter the vault</h2>
+              </div>
+              <span className="login-form-code">IDV / 01</span>
+            </header>
+
+            <p className="form-intro">Use the credentials assigned to this shared workspace.</p>
+
+            {!configured && (
+              <div className="login-notice" role="status">
+                <CircleAlert size={16} />
+                <span>Add the Supabase URL and anonymous key to <code>.env.local</code> before signing in.</span>
+              </div>
+            )}
+
+            <div className="login-fields">
+              <label className="login-field">
+                <span>Email address</span>
+                <span className="login-input-shell">
+                  <Mail size={16} aria-hidden="true" />
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="name@idevelopit.agency"
+                    required
+                    autoFocus
+                  />
+                </span>
+              </label>
+
+              <label className="login-field">
+                <span>Password</span>
+                <span className="login-input-shell login-password-shell">
+                  <KeyRound size={16} aria-hidden="true" />
+                  <input
+                    type={passwordVisible ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter workspace password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPasswordVisible((visible) => !visible)}
+                    aria-label={passwordVisible ? "Hide password" : "Show password"}
+                    aria-pressed={passwordVisible}
+                  >
+                    {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </span>
+              </label>
             </div>
-          )}
 
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@team.com"
-              required
-            />
-          </label>
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </label>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-          <button
-            className="button button-primary button-full"
-            type="submit"
-            disabled={loading || !configured}
-          >
-            {loading ? "Signing in…" : "Enter workspace"}
-            <ArrowRight size={16} />
-          </button>
-        </form>
-      </section>
+            <div className="login-feedback" aria-live="polite">
+              {error && <p className="login-error" role="alert"><CircleAlert size={15} />{error}</p>}
+            </div>
+
+            <button
+              className="login-submit"
+              type="submit"
+              disabled={loading || !configured}
+            >
+              <span>{loading ? "Opening workspace" : "Enter workspace"}<small>{loading ? "Validating secure session" : "Continue to your dashboard"}</small></span>
+              {loading ? <LoaderCircle className="login-spinner" size={18} /> : <ArrowUpRight size={18} />}
+            </button>
+
+            <footer className="login-form-footer">
+              <span><ShieldCheck size={14} /> Protected session</span>
+              <span>Supabase Auth</span>
+            </footer>
+          </form>
+        </section>
+      </div>
+
+      <footer className="login-page-footer">
+        <span><i /> Shared operating view</span>
+        <span>IDEVELOPIT / INTERNAL SYSTEM</span>
+        <span>BEIRUT · LB</span>
+      </footer>
     </main>
   );
 }

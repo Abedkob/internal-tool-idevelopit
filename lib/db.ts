@@ -40,7 +40,7 @@ function throwIfError(error: { message: string } | null) {
 
 function notifyDataChanged() {
   if (typeof window !== "undefined")
-    window.dispatchEvent(new Event("team-console:data-changed"));
+    window.dispatchEvent(new Event("idevelopit-vault:data-changed"));
 }
 
 function pageBounds(page: number, pageSize: number) {

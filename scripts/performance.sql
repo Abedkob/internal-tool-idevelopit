@@ -1,5 +1,5 @@
 -- ============================================================
--- Team Console — pagination and query-performance migration
+-- idevelopit-vault — pagination and query-performance migration
 -- Run AFTER schema.sql. Safe to re-run.
 -- ============================================================
 

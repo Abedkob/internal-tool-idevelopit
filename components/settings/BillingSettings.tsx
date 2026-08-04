@@ -55,7 +55,7 @@ export function BillingSettings() {
   const text = (key: keyof AppSettings, label: string, type = "text") => <label className="field"><span>{label}</span><input type={type} value={String(value[key] ?? "")} onChange={(e) => set(key, e.target.value as never)} /></label>;
   const area = (key: keyof AppSettings, label: string) => <label className="field span-2"><span>{label}</span><textarea rows={3} value={String(value[key] ?? "")} onChange={(e) => set(key, e.target.value as never)} /></label>;
   return <form className="billing-settings" onSubmit={save}>
-    <header className="page-heading"><div><p className="eyebrow">Billing foundation</p><h2>Company & invoice settings</h2><p>These defaults flow into contracts and invoices. Finalized invoices keep snapshots.</p></div><button className="button button-primary" disabled={busy}>Save billing settings</button></header>
+    <header className="settings-intro billing-settings-intro"><span><Building2 size={19}/></span><div><p className="eyebrow">Billing foundation</p><h2>Company & invoice settings</h2><p>These defaults flow into contracts and invoices. Finalized invoices keep snapshots.</p></div><button className="button button-primary" disabled={busy}>Save billing settings</button></header>
     <div className="billing-settings-grid">
       <section className="settings-card"><div className="section-heading"><div><p className="eyebrow"><Building2 size={14}/> Company profile</p><h3>Shown on invoices</h3></div></div><div className="form-grid">
         {text("company_name","Company name")}{text("company_tagline","Tagline")}{text("company_phone","Phone","tel")}{text("company_email","Email","email")}{text("company_website","Website","url")}

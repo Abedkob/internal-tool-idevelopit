@@ -1,5 +1,5 @@
 -- ============================================================
--- Team Console — optional demo seed
+-- idevelopit-vault — optional demo seed
 -- Run AFTER schema.sql. Catalog data (services, categories) is
 -- safe anytime. Contacts/tasks are seeded against the first
 -- profile, so sign up at least one member first.

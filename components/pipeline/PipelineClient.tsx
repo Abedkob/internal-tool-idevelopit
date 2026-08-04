@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Columns3, MapPin, Plus } from "lucide-react";
-import { ContactDrawer } from "@/components/ContactDrawer";
-import { HeatChip } from "@/components/HeatChip";
+import { ContactDrawer } from "@/components/contacts/ContactDrawer";
+import { HeatChip } from "@/components/contacts/HeatChip";
 import {
   getContact,
   listPipelineContacts,

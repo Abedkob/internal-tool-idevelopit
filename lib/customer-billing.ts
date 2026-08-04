@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CustomerBillingValue } from "@/components/CustomerBillingProfile";
+import type { CustomerBillingValue } from "@/components/billing/shared/CustomerBillingProfile";
 import { updateContact } from "@/lib/db";
 
 export async function syncCustomerBilling(supabase: SupabaseClient, contactId: string, value: CustomerBillingValue) {

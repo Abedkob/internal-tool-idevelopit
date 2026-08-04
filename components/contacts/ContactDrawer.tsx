@@ -24,7 +24,7 @@ import {
 } from "@/lib/db";
 import { createClient } from "@/lib/supabase/client";
 import { fmtDay, initials, money } from "@/lib/format";
-import { HeatChip } from "@/components/HeatChip";
+import { HeatChip } from "@/components/contacts/HeatChip";
 import type {
   ActivityChannel,
   Activity,

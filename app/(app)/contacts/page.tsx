@@ -1,4 +1,4 @@
-import { ContactsClient } from "@/components/ContactsClient";
+import { ContactsClient } from "@/components/contacts/ContactsClient";
 import { Suspense } from "react";
 
 export const metadata = { title: "Contacts" };

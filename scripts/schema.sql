@@ -1,5 +1,5 @@
 -- ============================================================
--- Team Console — Supabase schema
+-- idevelopit-vault — Supabase schema
 -- Run once in the Supabase SQL editor (or `supabase db` CLI)
 -- before using the app.
 -- ============================================================

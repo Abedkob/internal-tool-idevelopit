@@ -1,0 +1,25 @@
+/* Final shell-specific overrides kept separate from page feature styles. */
+.sidebar .sidebar-close {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .sidebar .sidebar-close {
+    display: grid;
+  }
+}
+
+@media (forced-colors: active) {
+  .nav-link.active,
+  .mobile-nav-item.active {
+    outline: 2px solid Highlight;
+  }
+  .nav-link.active::before,
+  .mobile-nav-item.active::before {
+    background: Highlight;
+  }
+  .nav-icon,
+  .workspace-status-icon {
+    border: 1px solid ButtonText;
+  }
+}

@@ -10,8 +10,8 @@ import {
   Receipt,
   WalletCards,
 } from "lucide-react";
-import { ContactDrawer } from "@/components/ContactDrawer";
-import { HeatChip } from "@/components/HeatChip";
+import { ContactDrawer } from "@/components/contacts/ContactDrawer";
+import { HeatChip } from "@/components/contacts/HeatChip";
 import { createClient } from "@/lib/supabase/client";
 import { fmtDay, initials, money } from "@/lib/format";
 import {

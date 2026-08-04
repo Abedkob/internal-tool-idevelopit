@@ -1,5 +1,5 @@
 -- ============================================================
--- Team Console - billing foundation
+-- idevelopit-vault - billing foundation
 -- Run AFTER roles-and-expense-editing.sql. Safe to re-run.
 -- The legacy public.payments table is intentionally untouched.
 -- ============================================================
@@ -71,7 +71,7 @@ create table if not exists public.app_settings (
 );
 
 insert into public.app_settings (id, company_name)
-values (1, 'Team Console')
+values (1, 'idevelopit-vault')
 on conflict (id) do nothing;
 
 create table if not exists public.document_templates (

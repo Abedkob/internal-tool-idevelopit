@@ -19,8 +19,8 @@ import {
   listExpensesPage,
   listProfiles,
 } from "@/lib/db";
-import { Pagination } from "@/components/Pagination";
-import { EditExpenseModal } from "@/components/EditExpenseModal";
+import { Pagination } from "@/components/ui/Pagination";
+import { EditExpenseModal } from "@/components/expenses/EditExpenseModal";
 import { createClient } from "@/lib/supabase/client";
 import { fmtDay, initials, money } from "@/lib/format";
 import type {

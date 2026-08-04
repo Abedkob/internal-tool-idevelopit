@@ -10,10 +10,10 @@ import {
   UsersRound,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ContactDrawer } from "@/components/ContactDrawer";
-import { HeatChip } from "@/components/HeatChip";
-import { NewContactModal } from "@/components/NewContactModal";
-import { Pagination } from "@/components/Pagination";
+import { ContactDrawer } from "@/components/contacts/ContactDrawer";
+import { HeatChip } from "@/components/contacts/HeatChip";
+import { NewContactModal } from "@/components/contacts/NewContactModal";
+import { Pagination } from "@/components/ui/Pagination";
 import {
   getContact,
   listContactsPage,

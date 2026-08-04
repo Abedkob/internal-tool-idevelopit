@@ -222,10 +222,13 @@ export type AppSettings = {
   updated_at: string;
 };
 
+export type TemplateBackgroundStyle = "clean" | "idevelopit-wave";
+
 export type TemplateConfig = {
   paperSize: "A4";
   orientation: "portrait" | "landscape";
   primaryColor: string;
+  backgroundStyle?: TemplateBackgroundStyle;
   fontFamily: string;
   logoWidth: number;
   stampWidth: number;

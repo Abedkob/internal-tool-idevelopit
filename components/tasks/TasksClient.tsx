@@ -15,8 +15,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { NewTaskModal } from "@/components/NewTaskModal";
-import { Pagination } from "@/components/Pagination";
+import { NewTaskModal } from "@/components/tasks/NewTaskModal";
+import { Pagination } from "@/components/ui/Pagination";
 import {
   addTaskItem,
   listProfiles,
@@ -58,7 +58,7 @@ function ChecklistItem({
       await onRefresh();
     } catch (caught) {
       window.dispatchEvent(
-        new CustomEvent("team-console:mutation-error", {
+        new CustomEvent("idevelopit-vault:mutation-error", {
           detail:
             caught instanceof Error
               ? caught.message
@@ -196,7 +196,7 @@ function TaskCard({
       await onRefresh();
     } catch (caught) {
       window.dispatchEvent(
-        new CustomEvent("team-console:mutation-error", {
+        new CustomEvent("idevelopit-vault:mutation-error", {
           detail:
             caught instanceof Error
               ? caught.message
@@ -453,9 +453,9 @@ export function TasksClient() {
   useEffect(() => {
     const showError = (event: Event) =>
       setError((event as CustomEvent<string>).detail);
-    window.addEventListener("team-console:mutation-error", showError);
+    window.addEventListener("idevelopit-vault:mutation-error", showError);
     return () =>
-      window.removeEventListener("team-console:mutation-error", showError);
+      window.removeEventListener("idevelopit-vault:mutation-error", showError);
   }, []);
   const updateQuery = useCallback(
     (updates: Record<string, string | number>) => {

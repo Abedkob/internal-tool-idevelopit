@@ -1,5 +1,5 @@
 -- ============================================================
--- Team Console - account roles and protected expense editing
+-- idevelopit-vault - account roles and protected expense editing
 -- Run AFTER schema.sql and performance.sql. Safe to re-run.
 -- ============================================================
 
