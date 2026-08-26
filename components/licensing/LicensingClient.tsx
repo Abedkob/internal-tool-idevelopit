@@ -19,7 +19,7 @@ import { ApiConnectionPanel } from "@/components/licensing/ApiConnectionPanel";
 import { LicenseDetailDrawer } from "@/components/licensing/LicenseDetailDrawer";
 import { ProductModal } from "@/components/licensing/ProductModal";
 import { Pagination } from "@/components/ui/Pagination";
-import { listInvoices } from "@/lib/billing";
+import { listPaymentInvoices } from "@/lib/billing";
 import { listContactsPage } from "@/lib/db";
 import { listLicensedProducts, listLicenses, maskedLicenseKey } from "@/lib/licensing";
 import { fmtDay, initials, relDate } from "@/lib/format";
@@ -45,6 +45,7 @@ export function LicensingClient() {
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
   const [issueOpen, setIssueOpen] = useState(false);
+  const [issueReady, setIssueReady] = useState(false);
   const [apiOpen, setApiOpen] = useState(false);
   const [productDraft, setProductDraft] = useState<LicensedProduct | null | undefined>(undefined);
   const [selected, setSelected] = useState<string | null>(null);
@@ -54,16 +55,12 @@ export function LicensingClient() {
     setMessage("");
     try {
       const supabase = createClient();
-      const [licenseRows, productRows, contactPage, invoiceRows] = await Promise.all([
+      const [licenseRows, productRows] = await Promise.all([
         listLicenses(supabase),
         listLicensedProducts(supabase),
-        listContactsPage(supabase, { page: 1, pageSize: 500, filter: "customers" }),
-        listInvoices(supabase),
       ]);
       setLicenses(licenseRows);
       setProducts(productRows);
-      setContacts(contactPage.rows);
-      setInvoices(invoiceRows);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "Licensing registry could not load.");
     } finally {
@@ -71,6 +68,28 @@ export function LicensingClient() {
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  async function startIssuing() {
+    setBusy(true);
+    setMessage("");
+    try {
+      if (!issueReady) {
+        const supabase = createClient();
+        const [contactPage, invoiceRows] = await Promise.all([
+          listContactsPage(supabase, { page: 1, pageSize: 100, filter: "customers" }),
+          listPaymentInvoices(supabase),
+        ]);
+        setContacts(contactPage.rows);
+        setInvoices(invoiceRows);
+        setIssueReady(true);
+      }
+      setIssueOpen(true);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "License editor data could not load.");
+    } finally {
+      setBusy(false);
+    }
+  }
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("license");
     if (id) setSelected(id);
@@ -105,7 +124,7 @@ export function LicensingClient() {
     <div className="licensing-view">
       <section className="license-command-strip">
         <div className="license-command-copy"><span className="license-command-icon"><KeyRound size={20} /></span><div><p className="eyebrow">Entitlement registry</p><h1>Licensing</h1><p>Connect every product activation to its customer, invoice, and lifecycle.</p></div></div>
-        <div className="license-command-actions"><button className="button button-secondary" onClick={() => setApiOpen((current) => !current)}><Unplug size={15} /> {apiOpen ? "Hide API" : "Connect app"}</button><button className="button button-secondary" onClick={() => setProductDraft(null)}><Box size={15} /> Add product</button><button className="button button-primary" onClick={() => setIssueOpen(true)} disabled={!products.some((product) => product.active)}><Plus size={15} /> Issue license</button></div>
+        <div className="license-command-actions"><button className="button button-secondary" onClick={() => setApiOpen((current) => !current)}><Unplug size={15} /> {apiOpen ? "Hide API" : "Connect app"}</button><button className="button button-secondary" onClick={() => setProductDraft(null)}><Box size={15} /> Add product</button><button className="button button-primary" onClick={() => void startIssuing()} disabled={busy || !products.some((product) => product.active)}><Plus size={15} /> Issue license</button></div>
       </section>
 
       {apiOpen && <ApiConnectionPanel products={products} onClose={() => setApiOpen(false)} />}

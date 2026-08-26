@@ -6,6 +6,7 @@ import type {
   LicenseEvent,
   LicensedProduct,
 } from "@/types/db";
+import { cachedBrowserQuery, invalidateBrowserQueries } from "./query-cache.ts";
 
 function fail(error: { message: string } | null) {
   if (error) throw new Error(error.message);
@@ -13,18 +14,21 @@ function fail(error: { message: string } | null) {
 
 function notifyLicensingChanged() {
   if (typeof window === "undefined") return;
+  invalidateBrowserQueries();
   window.dispatchEvent(new Event("idevelopit-vault:licensing-changed"));
   window.dispatchEvent(new Event("idevelopit-vault:data-changed"));
 }
 
 export async function listLicensedProducts(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from("licensed_products")
-    .select("*")
-    .order("active", { ascending: false })
-    .order("name");
-  fail(error);
-  return (data ?? []) as LicensedProduct[];
+  return cachedBrowserQuery("reference:licensed-products", async () => {
+    const { data, error } = await supabase
+      .from("licensed_products")
+      .select("*")
+      .order("active", { ascending: false })
+      .order("name");
+    fail(error);
+    return (data ?? []) as LicensedProduct[];
+  }, 5 * 60_000);
 }
 
 export async function saveLicensedProduct(

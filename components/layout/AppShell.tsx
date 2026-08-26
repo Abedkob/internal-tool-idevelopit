@@ -62,7 +62,7 @@ export function AppShell({
       active = false;
       window.removeEventListener("idevelopit-vault:data-changed", refreshBadges);
     };
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
     if (!mobile || !menuOpen) return;

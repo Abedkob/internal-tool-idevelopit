@@ -14,19 +14,20 @@ import {
   X,
 } from "lucide-react";
 import { InvoiceTemplateChooser } from "@/components/billing/invoices/InvoiceTemplateChooser";
+import { Pagination } from "@/components/ui/Pagination";
 import { BillingLineEditor, emptyBillingLine } from "@/components/billing/shared/BillingLineEditor";
 import {
   CustomerBillingProfile,
   customerBillingValue,
   type CustomerBillingValue,
 } from "@/components/billing/shared/CustomerBillingProfile";
-import { createInvoice, generateMonthlyInvoices, listInvoices, listTemplates } from "@/lib/billing";
+import { createInvoice, generateMonthlyInvoices, listInvoicesPage, listTemplates } from "@/lib/billing";
 import { calculateTotals, validateInvoice } from "@/lib/billing-validation";
 import { syncCustomerBilling } from "@/lib/customer-billing";
 import { listContactsPage, listServices } from "@/lib/db";
 import { fmtDay, money } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
-import type { BillingLineInput, Contact, DocumentTemplate, Invoice, Service } from "@/types/db";
+import type { BillingLineInput, Contact, DocumentTemplate, Invoice, PagedResult, Service } from "@/types/db";
 
 const today = new Date().toISOString().slice(0, 10);
 function addDays(date: string, days: number) {
@@ -66,6 +67,9 @@ function isInvoiceLate(invoice: Invoice) {
 
 export function InvoicesClient() {
   const [rows, setRows] = useState<Invoice[]>([]);
+  const [result, setResult] = useState<PagedResult<Invoice>>({ rows: [], page: 1, pageSize: 25, total: 0, totalPages: 1 });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
@@ -74,6 +78,7 @@ export function InvoicesClient() {
   const [items, setItems] = useState<BillingLineInput[]>([emptyBillingLine()]);
   const [billing, setBilling] = useState<CustomerBillingValue>(customerBillingValue());
   const [open, setOpen] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -81,22 +86,15 @@ export function InvoicesClient() {
     setBusy(true);
     try {
       const supabase = createClient();
-      const [invoiceRows, contactPage, serviceRows, templateRows] = await Promise.all([
-        listInvoices(supabase, status),
-        listContactsPage(supabase, { page: 1, pageSize: 100, filter: "customers" }),
-        listServices(supabase),
-        listTemplates(supabase),
-      ]);
-      setRows(invoiceRows);
-      setContacts(contactPage.rows);
-      setServices(serviceRows);
-      setTemplates(templateRows.filter((template) => template.document_type === "invoice"));
+      const invoicePage = await listInvoicesPage(supabase, { status, page, pageSize });
+      setResult(invoicePage);
+      setRows(invoicePage.rows);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Invoices could not load.");
     } finally {
       setBusy(false);
     }
-  }, [status]);
+  }, [page, pageSize, status]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -114,12 +112,34 @@ export function InvoicesClient() {
     setBilling(customerBillingValue(contact));
   }
 
-  function startInvoice() {
-    const preferred = templates.find((template) => template.is_default) ?? templates[0];
-    setForm({ ...initial, template_id: preferred?.id ?? "" });
-    setItems([emptyBillingLine()]);
-    setBilling(customerBillingValue());
-    setOpen(true);
+  async function startInvoice() {
+    setBusy(true);
+    setMessage("");
+    try {
+      let availableTemplates = templates;
+      if (!editorReady) {
+        const supabase = createClient();
+        const [contactPage, serviceRows, templateRows] = await Promise.all([
+          listContactsPage(supabase, { page: 1, pageSize: 100, filter: "customers" }),
+          listServices(supabase),
+          listTemplates(supabase),
+        ]);
+        availableTemplates = templateRows.filter((template) => template.document_type === "invoice");
+        setContacts(contactPage.rows);
+        setServices(serviceRows);
+        setTemplates(availableTemplates);
+        setEditorReady(true);
+      }
+      const preferred = availableTemplates.find((template) => template.is_default) ?? availableTemplates[0];
+      setForm({ ...initial, template_id: preferred?.id ?? "" });
+      setItems([emptyBillingLine()]);
+      setBilling(customerBillingValue());
+      setOpen(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Invoice editor data could not load.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function save(event: FormEvent) {
@@ -166,9 +186,9 @@ export function InvoicesClient() {
       <section className="surface billing-list-surface">
         <header className="surface-toolbar billing-toolbar">
           <div className="toolbar-heading"><p className="eyebrow">Billing ledger</p><h2>Invoices</h2></div>
-          <div className="segmented billing-segmented" aria-label="Filter invoices">{statuses.map((item) => <button key={item} className={status === item ? "selected" : ""} onClick={() => setStatus(item)}>{item.replace("_", " ")}{status === item && <span>{rows.length}</span>}</button>)}</div>
+          <div className="segmented billing-segmented" aria-label="Filter invoices">{statuses.map((item) => <button key={item} className={status === item ? "selected" : ""} onClick={() => { setStatus(item); setPage(1); }}>{item.replace("_", " ")}{status === item && <span>{result.total}</span>}</button>)}</div>
           <button className="button button-secondary" onClick={() => void generate()} disabled={busy}><CalendarSync size={15} /> Generate month</button>
-          <button className="button button-primary" onClick={startInvoice}><FilePlus2 size={15} /> New invoice</button>
+          <button className="button button-primary" onClick={() => void startInvoice()} disabled={busy}><FilePlus2 size={15} /> New invoice</button>
         </header>
 
         <div className="billing-table-wrap"><table className="billing-table invoice-ledger-table"><thead><tr><th>Document</th><th>Customer</th><th>Schedule</th><th>Status</th><th>Collection</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{rows.map((row) => {
@@ -194,6 +214,7 @@ export function InvoicesClient() {
 
         {busy && <div className="feed-loading"><LoaderCircle className="spin-icon" size={16} /> Loading…</div>}
         {!busy && !rows.length && <div className="panel-empty billing-panel-empty"><span><ReceiptText size={19} /></span><div><strong>No invoices here</strong><p>Create a draft or generate invoices from active contracts.</p></div></div>}
+        {!busy && result.total > 0 && <Pagination page={result.page} pageSize={result.pageSize} total={result.total} totalPages={result.totalPages} disabled={busy} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
       </section>
 
       {open && <div className="modal-layer"><section className="modal billing-modal" role="dialog" aria-modal="true">

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Children, FormEvent, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
@@ -12,13 +12,17 @@ import {
   Pencil,
   Plus,
   Save,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
 import { NewTaskModal } from "@/components/tasks/NewTaskModal";
+import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   addTaskItem,
+  deleteTask,
+  deleteTaskItem,
   listProfiles,
   listTasksPage,
   updateTask,
@@ -44,18 +48,20 @@ function ChecklistItem({
 }: {
   item: TaskItem;
   children?: React.ReactNode;
-  onRefresh: () => Promise<void>;
+  onRefresh: () => Promise<unknown>;
 }) {
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(item.content);
   const [addingChild, setAddingChild] = useState(false);
   const [childContent, setChildContent] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     try {
       await action();
       await onRefresh();
+      return true;
     } catch (caught) {
       window.dispatchEvent(
         new CustomEvent("idevelopit-vault:mutation-error", {
@@ -65,9 +71,15 @@ function ChecklistItem({
               : "Checklist change could not be saved.",
         }),
       );
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+  const childCount = children ? Children.count(children) : 0;
+  async function remove() {
+    const removed = await run(() => deleteTaskItem(createClient(), item.id));
+    if (removed) setDeleting(false);
   }
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -151,6 +163,7 @@ function ChecklistItem({
             )}
           </>
         )}
+        <button type="button" className="row-action checklist-delete-button" onClick={() => setDeleting(true)} disabled={busy} aria-label={`Delete ${item.content}`} title="Delete checklist item"><Trash2 size={12} /></button>
       </div>
       {addingChild && (
         <form className="add-item-form nested-add" onSubmit={addChild}>
@@ -166,6 +179,7 @@ function ChecklistItem({
         </form>
       )}
       {children}
+      {deleting && <TaskDeleteDialog kind={item.parent_id ? "sub-item" : "item"} name={item.content} childCount={childCount} busy={busy} onClose={() => setDeleting(false)} onConfirm={remove} />}
     </div>
   );
 }
@@ -174,10 +188,12 @@ function TaskCard({
   task,
   profiles,
   onRefresh,
+  onDeleted,
 }: {
   task: Task;
   profiles: Profile[];
-  onRefresh: () => Promise<void>;
+  onRefresh: () => Promise<unknown>;
+  onDeleted: () => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(task.status === "open");
   const [editing, setEditing] = useState(false);
@@ -187,13 +203,15 @@ function TaskCard({
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [newItem, setNewItem] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const roots = (task.items ?? []).filter((item) => !item.parent_id);
   const completed = task.items?.filter((item) => item.done).length ?? 0;
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<void>, refresh = true) {
     setBusy(true);
     try {
       await action();
-      await onRefresh();
+      if (refresh) await onRefresh();
+      return true;
     } catch (caught) {
       window.dispatchEvent(
         new CustomEvent("idevelopit-vault:mutation-error", {
@@ -203,9 +221,16 @@ function TaskCard({
               : "Task change could not be saved.",
         }),
       );
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+  async function removeTask() {
+    const removed = await run(() => deleteTask(createClient(), task.id), false);
+    if (!removed) return;
+    setDeleting(false);
+    await onDeleted();
   }
   async function saveTask(event: FormEvent) {
     event.preventDefault();
@@ -350,6 +375,7 @@ function TaskCard({
             />
           </label>
           <div className="task-edit-actions">
+            <button type="button" className="button task-delete-trigger" onClick={() => setDeleting(true)} disabled={busy}><Trash2 size={14} /> Delete task</button>
             <button
               type="button"
               className="button button-secondary"
@@ -395,6 +421,7 @@ function TaskCard({
           </form>
         </div>
       )}
+      {deleting && <TaskDeleteDialog kind="task" name={task.title} childCount={task.items?.length ?? 0} busy={busy} onClose={() => setDeleting(false)} onConfirm={removeTask} />}
     </article>
   );
 }
@@ -439,10 +466,12 @@ export function TasksClient() {
       ]);
       setResult(taskData);
       setProfiles(profileData);
+      return taskData;
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Tasks could not be loaded.",
       );
+      return null;
     } finally {
       setLoading(false);
     }
@@ -510,6 +539,11 @@ export function TasksClient() {
             task={task}
             profiles={profiles}
             onRefresh={load}
+            onDeleted={async () => {
+              const next = await load();
+              if (next && next.rows.length === 0 && next.total > 0 && requestedPage > 1)
+                updateQuery({ page: requestedPage - 1 });
+            }}
           />
         ))}
       </section>

@@ -7,7 +7,9 @@ import type {
   Invoice,
   InvoicePaymentRecord,
   InvoicePaymentMethod,
+  PagedResult,
 } from "@/types/db";
+import { cachedBrowserQuery, invalidateBrowserQueries } from "./query-cache.ts";
 
 function fail(error: { message: string } | null) {
   if (error) throw new Error(error.message);
@@ -15,6 +17,7 @@ function fail(error: { message: string } | null) {
 
 function notifyBillingChanged() {
   if (typeof window === "undefined") return;
+  invalidateBrowserQueries();
   window.dispatchEvent(new Event("idevelopit-vault:billing-changed"));
   window.dispatchEvent(new Event("idevelopit-vault:data-changed"));
 }
@@ -29,6 +32,18 @@ function numbers<T extends Record<string, any>>(row: T, keys: string[]): T {
     if (key in copy) copy[key as keyof T] = Number(copy[key]) as T[keyof T];
   });
   return copy;
+}
+
+function withEffectiveInvoiceStatus<T extends Invoice>(invoice: T): T {
+  const today = new Date().toISOString().slice(0, 10);
+  if (
+    invoice.balance_due > 0 &&
+    invoice.due_date < today &&
+    (invoice.status === "sent" || invoice.status === "partially_paid")
+  ) {
+    return { ...invoice, status: "overdue" };
+  }
+  return invoice;
 }
 
 export async function getAppSettings(supabase: SupabaseClient) {
@@ -65,14 +80,17 @@ export async function signedAssetUrl(supabase: SupabaseClient, path?: string | n
 }
 
 export async function listTemplates(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("document_templates").select("*").order("document_type").order("name");
-  fail(error);
-  return (data ?? []) as DocumentTemplate[];
+  return cachedBrowserQuery("reference:templates", async () => {
+    const { data, error } = await supabase.from("document_templates").select("*").order("document_type").order("name");
+    fail(error);
+    return (data ?? []) as DocumentTemplate[];
+  }, 5 * 60_000);
 }
 
 export async function saveTemplate(supabase: SupabaseClient, template: Partial<DocumentTemplate>, id?: string | null) {
   const { data, error } = await supabase.rpc("save_document_template", { p_template: template, p_id: id ?? null });
   fail(error);
+  invalidateBrowserQueries(["reference:templates"]);
   return data as string;
 }
 
@@ -80,6 +98,7 @@ export async function deleteTemplate(supabase: SupabaseClient, template: Documen
   if (template.is_default) throw new Error("Choose another default before deleting this template.");
   const { error } = await supabase.from("document_templates").delete().eq("id", template.id);
   fail(error);
+  invalidateBrowserQueries(["reference:templates"]);
 }
 
 export async function listContracts(supabase: SupabaseClient) {
@@ -131,23 +150,53 @@ export async function generateMonthlyInvoices(supabase: SupabaseClient, month: s
   return data as { created: unknown[]; skipped: unknown[]; errors: unknown[] };
 }
 
-export async function listInvoices(supabase: SupabaseClient, status = "all") {
-  const { error: refreshError } = await supabase.rpc("refresh_invoice_statuses");
-  fail(refreshError);
-  let query = supabase.from("invoice_balances").select("*,contact:contacts(id,name,billing_name)");
-  if (status !== "all") query = query.eq("status", status);
-  const { data, error } = await query.order("created_at", { ascending: false });
+export async function listInvoicesPage(
+  supabase: SupabaseClient,
+  options: { status?: string; page: number; pageSize: number },
+): Promise<PagedResult<Invoice>> {
+  const page = Math.max(1, Math.floor(options.page) || 1);
+  const pageSize = [25, 50, 100].includes(options.pageSize) ? options.pageSize : 25;
+  const from = (page - 1) * pageSize;
+  const today = new Date().toISOString().slice(0, 10);
+  let query = supabase
+    .from("invoice_balances")
+    .select("*,contact:contacts(id,name,billing_name)", { count: "exact" });
+  if (options.status === "overdue") {
+    query = query
+      .in("status", ["sent", "partially_paid", "overdue"])
+      .lt("due_date", today)
+      .gt("balance_due", 0);
+  } else if (options.status === "sent" || options.status === "partially_paid") {
+    query = query.eq("status", options.status).gte("due_date", today);
+  } else if (options.status && options.status !== "all") {
+    query = query.eq("status", options.status);
+  }
+  const { data, count, error } = await query
+    .order("created_at", { ascending: false })
+    .range(from, from + pageSize - 1);
   fail(error);
-  return (data ?? []).map((row: any) => numbers(row, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"])) as Invoice[];
+  const rows = (data ?? []).map((row: any) =>
+    withEffectiveInvoiceStatus(
+      numbers(row, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]) as Invoice,
+    ),
+  );
+  const total = count ?? 0;
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
 export async function getInvoice(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase.from("invoice_balances").select(invoiceSelect).eq("id", id).single();
   fail(error);
-  const invoice = numbers(data as any, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]);
+  const invoice = withEffectiveInvoiceStatus(numbers(data as any, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]) as Invoice);
   invoice.items = (invoice.items ?? []).map((item: any) => numbers(item, ["quantity", "unit_price", "line_total"])).sort((a: any, b: any) => a.sort_order - b.sort_order);
   invoice.invoice_payments = (invoice.invoice_payments ?? []).map((payment: any) => numbers(payment, ["amount"]));
-  return invoice as Invoice;
+  return invoice;
 }
 
 export async function finalizeInvoice(supabase: SupabaseClient, id: string) {
@@ -179,10 +228,10 @@ export async function listContactInvoiceLedger(supabase: SupabaseClient, contact
     .order("created_at", { ascending: false })
     .limit(100);
   fail(error);
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: any) => withEffectiveInvoiceStatus({
     ...numbers(row, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]),
     invoice_payments: (row.invoice_payments ?? []).map((payment: any) => numbers(payment, ["amount"])),
-  })) as Invoice[];
+  } as Invoice)) as Invoice[];
 }
 
 export async function listInvoicePaymentRecords(supabase: SupabaseClient) {
@@ -207,6 +256,6 @@ export async function listPaymentInvoices(supabase: SupabaseClient) {
     .limit(500);
   fail(error);
   return (data ?? []).map((row: any) =>
-    numbers(row, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]),
+    withEffectiveInvoiceStatus(numbers(row, ["subtotal", "discount", "total_amount", "amount_paid", "balance_due"]) as Invoice),
   ) as Invoice[];
 }

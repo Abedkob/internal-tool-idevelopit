@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { AppShell } from "@/components/layout/AppShell";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
@@ -11,23 +12,23 @@ export default async function ProtectedLayout({
   children: React.ReactNode;
 }) {
   if (!hasSupabaseConfig()) redirect("/login");
+  const requestHeaders = await headers();
+  const userId = requestHeaders.get("x-idv-auth-user");
+  const email = requestHeaders.get("x-idv-auth-email") ?? "";
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("name,color")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   return (
     <AppShell
       user={{
-        email: user.email ?? "",
-        name: profile?.name ?? user.email?.split("@")[0] ?? "Team member",
+        email,
+        name: profile?.name ?? (email ? email.split("@")[0] : "Team member"),
         color: profile?.color ?? "#3D5AF1",
       }}
     >

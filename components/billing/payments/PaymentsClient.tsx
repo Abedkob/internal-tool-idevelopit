@@ -59,6 +59,7 @@ export function PaymentsClient() {
   const [methodFilter, setMethodFilter] = useState("all");
   const [payment, setPayment] = useState(emptyPayment);
   const [open, setOpen] = useState(false);
+  const [invoiceOptionsReady, setInvoiceOptionsReady] = useState(false);
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -66,13 +67,11 @@ export function PaymentsClient() {
     setBusy(true);
     try {
       const supabase = createClient();
-      const [paymentRows, invoiceRows, currentRole] = await Promise.all([
+      const [paymentRows, currentRole] = await Promise.all([
         listInvoicePaymentRecords(supabase),
-        listPaymentInvoices(supabase),
         getCurrentUserRole(supabase),
       ]);
       setRecords(paymentRows);
-      setInvoices(invoiceRows);
       setRole(currentRole);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Payment records could not load.");
@@ -131,10 +130,21 @@ export function PaymentsClient() {
     receipts: filtered.length,
   }), [filtered]);
 
-  function startPayment() {
-    setPayment(emptyPayment);
+  async function startPayment() {
+    setBusy(true);
     setMessage("");
-    setOpen(true);
+    try {
+      if (!invoiceOptionsReady) {
+        setInvoices(await listPaymentInvoices(createClient()));
+        setInvoiceOptionsReady(true);
+      }
+      setPayment(emptyPayment);
+      setOpen(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Open invoices could not load.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function chooseCustomer(customerId: string) {
@@ -168,6 +178,7 @@ export function PaymentsClient() {
         notes: payment.notes,
       });
       setOpen(false);
+      setInvoiceOptionsReady(false);
       setMessage("Payment recorded and linked to the customer invoice.");
       await load();
     } catch (error) {
@@ -190,7 +201,7 @@ export function PaymentsClient() {
           <strong>{money(metrics.collected, filtered[0]?.invoice.currency || "USD")}</strong>
           <small>{metrics.receipts} payment {metrics.receipts === 1 ? "record" : "records"}</small>
         </div>
-        {role === "superadmin" && <button className="button button-primary" onClick={startPayment}><Plus size={15} /> Record payment</button>}
+        {role === "superadmin" && <button className="button button-primary" onClick={() => void startPayment()} disabled={busy}><Plus size={15} /> Record payment</button>}
       </section>
 
       <section className="payment-metric-strip" aria-label="Payment ledger summary">

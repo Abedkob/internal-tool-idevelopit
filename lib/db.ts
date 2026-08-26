@@ -24,6 +24,7 @@ import type {
   TaskPriority,
   TaskStatus,
 } from "@/types/db";
+import { cachedBrowserQuery, invalidateBrowserQueries } from "./query-cache.ts";
 
 const contactSummarySelect = `
   id,name,instagram,whatsapp,email,location,billing_name,billing_contact,billing_address,met_at,stage,assigned_to,notes,created_by,created_at,last_touched_at,
@@ -39,8 +40,10 @@ function throwIfError(error: { message: string } | null) {
 }
 
 function notifyDataChanged() {
-  if (typeof window !== "undefined")
+  if (typeof window !== "undefined") {
+    invalidateBrowserQueries();
     window.dispatchEvent(new Event("idevelopit-vault:data-changed"));
+  }
 }
 
 function pageBounds(page: number, pageSize: number) {
@@ -275,27 +278,31 @@ export async function listAttentionContacts(
 export async function listProfiles(
   supabase: SupabaseClient,
 ): Promise<Profile[]> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("name");
-  throwIfError(error);
-  return (data ?? []) as Profile[];
+  return cachedBrowserQuery("reference:profiles", async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("name");
+    throwIfError(error);
+    return (data ?? []) as Profile[];
+  }, 5 * 60_000);
 }
 
 export async function listServices(
   supabase: SupabaseClient,
 ): Promise<Service[]> {
-  const { data, error } = await supabase
-    .from("services")
-    .select("*")
-    .order("name");
-  throwIfError(error);
-  return (data ?? []).map((service) => ({
-    ...service,
-    default_price: Number(service.default_price),
-    default_quantity: Number(service.default_quantity),
-  })) as Service[];
+  return cachedBrowserQuery("reference:services", async () => {
+    const { data, error } = await supabase
+      .from("services")
+      .select("*")
+      .order("name");
+    throwIfError(error);
+    return (data ?? []).map((service) => ({
+      ...service,
+      default_price: Number(service.default_price),
+      default_quantity: Number(service.default_quantity),
+    })) as Service[];
+  }, 5 * 60_000);
 }
 
 export async function listTasksPage(
@@ -358,12 +365,14 @@ export async function listExpensesPage(
 export async function getNavigationCounts(
   supabase: SupabaseClient,
 ): Promise<NavigationCounts> {
-  const { data, error } = await supabase.rpc("navigation_counts");
-  throwIfError(error);
-  return {
-    stale_contacts: Number(data?.stale_contacts ?? 0),
-    open_tasks: Number(data?.open_tasks ?? 0),
-  };
+  return cachedBrowserQuery("summary:navigation", async () => {
+    const { data, error } = await supabase.rpc("navigation_counts");
+    throwIfError(error);
+    return {
+      stale_contacts: Number(data?.stale_contacts ?? 0),
+      open_tasks: Number(data?.open_tasks ?? 0),
+    };
+  }, 30_000);
 }
 
 export async function getDashboardSummary(
@@ -435,26 +444,19 @@ export async function getContactPaymentSummary(
 }
 
 export async function getCurrentUserId(supabase: SupabaseClient) {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
   throwIfError(error);
-  if (!user) throw new Error("Your session has expired. Sign in again.");
-  return user.id;
+  if (!data?.claims?.sub)
+    throw new Error("Your session has expired. Sign in again.");
+  return data.claims.sub;
 }
 
 export async function getCurrentUserRole(
   supabase: SupabaseClient,
 ): Promise<AppRole> {
   const userId = await getCurrentUserId(supabase);
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("app_role")
-    .eq("id", userId)
-    .single();
-  throwIfError(error);
-  return data?.app_role === "superadmin" ? "superadmin" : "member";
+  const profile = (await listProfiles(supabase)).find((row) => row.id === userId);
+  return profile?.app_role === "superadmin" ? "superadmin" : "member";
 }
 
 export async function createContact(
@@ -568,6 +570,12 @@ export async function updateTask(
   notifyDataChanged();
 }
 
+export async function deleteTask(supabase: SupabaseClient, id: string) {
+  const { error } = await supabase.from("tasks").delete().eq("id", id);
+  throwIfError(error);
+  notifyDataChanged();
+}
+
 export async function addTaskItem(
   supabase: SupabaseClient,
   taskId: string,
@@ -596,6 +604,12 @@ export async function updateTaskItem(
     .from("task_items")
     .update(input)
     .eq("id", id);
+  throwIfError(error);
+  notifyDataChanged();
+}
+
+export async function deleteTaskItem(supabase: SupabaseClient, id: string) {
+  const { error } = await supabase.from("task_items").delete().eq("id", id);
   throwIfError(error);
   notifyDataChanged();
 }
