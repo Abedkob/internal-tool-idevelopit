@@ -121,6 +121,10 @@ export type ContactInput = Pick<
 export type ContactUpdate = Partial<Omit<ContactInput, "name">> & {
   name?: string;
 };
+export type ContactIdentity = Pick<
+  Contact,
+  "id" | "name" | "instagram" | "whatsapp" | "email"
+>;
 
 export type NewPaymentInput = {
   contact_id: string;

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AtSign,
+  FileUp,
   Mail,
   MessageCircle,
   Plus,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ContactDrawer } from "@/components/contacts/ContactDrawer";
+import { BulkContactsModal } from "@/components/contacts/BulkContactsModal";
 import { HeatChip } from "@/components/contacts/HeatChip";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { Pagination } from "@/components/ui/Pagination";
@@ -53,6 +55,7 @@ export function ContactsClient() {
   const [selected, setSelected] = useState<Contact | null>(null);
   const [searchDraft, setSearchDraft] = useState(query);
   const [newOpen, setNewOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState("");
@@ -139,6 +142,10 @@ export function ContactsClient() {
     await loadPage();
     setSelected(await getContact(createClient(), id));
   }
+  async function bulkImported() {
+    replaceParams({ page: 1 });
+    await loadPage();
+  }
   function rowKey(event: React.KeyboardEvent, contact: Contact) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -181,6 +188,13 @@ export function ContactsClient() {
               </button>
             ))}
           </div>
+          <button
+            className="button button-secondary"
+            onClick={() => setBulkOpen(true)}
+          >
+            <FileUp size={16} />
+            Add bulk
+          </button>
           <button
             className="button button-primary"
             onClick={() => setNewOpen(true)}
@@ -357,13 +371,22 @@ export function ContactsClient() {
                 : "Add the first relationship to start building your pipeline."}
             </p>
             {!query && (
-              <button
-                className="button button-primary"
-                onClick={() => setNewOpen(true)}
-              >
-                <Plus size={16} />
-                Add contact
-              </button>
+              <div className="empty-state-actions">
+                <button
+                  className="button button-secondary"
+                  onClick={() => setBulkOpen(true)}
+                >
+                  <FileUp size={16} />
+                  Add bulk
+                </button>
+                <button
+                  className="button button-primary"
+                  onClick={() => setNewOpen(true)}
+                >
+                  <Plus size={16} />
+                  Add contact
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -373,6 +396,13 @@ export function ContactsClient() {
           profiles={profiles}
           onClose={() => setNewOpen(false)}
           onCreated={created}
+        />
+      )}
+      {bulkOpen && (
+        <BulkContactsModal
+          profiles={profiles}
+          onClose={() => setBulkOpen(false)}
+          onImported={bulkImported}
         />
       )}
       {selected && (

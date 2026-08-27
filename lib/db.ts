@@ -4,6 +4,7 @@ import type {
   ActivityChannel,
   AppRole,
   Contact,
+  ContactIdentity,
   ContactInput,
   ContactStage,
   ContactUpdate,
@@ -148,6 +149,24 @@ export async function getContact(
     .single();
   throwIfError(error);
   return normalizeContact(data as unknown as Contact);
+}
+
+export async function listContactIdentities(
+  supabase: SupabaseClient,
+): Promise<ContactIdentity[]> {
+  const rows: ContactIdentity[] = [];
+  const batchSize = 1_000;
+  for (let from = 0; ; from += batchSize) {
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("id,name,instagram,whatsapp,email")
+      .order("id", { ascending: true })
+      .range(from, from + batchSize - 1);
+    throwIfError(error);
+    const batch = (data ?? []) as ContactIdentity[];
+    rows.push(...batch);
+    if (batch.length < batchSize) return rows;
+  }
 }
 
 function applyCursor(query: any, cursor?: Cursor | null) {
@@ -473,6 +492,25 @@ export async function createContact(
   if (!data) throw new Error("Contact was created without a returned record.");
   notifyDataChanged();
   return data.id as string;
+}
+
+export async function createContacts(
+  supabase: SupabaseClient,
+  inputs: ContactInput[],
+): Promise<string[]> {
+  if (!inputs.length) throw new Error("Choose at least one contact to import.");
+  if (inputs.length > 500) throw new Error("Import at most 500 contacts at a time.");
+  const userId = await getCurrentUserId(supabase);
+  const payload = inputs.map((input) => ({ ...input, created_by: userId }));
+  const { data, error } = await supabase
+    .from("contacts")
+    .insert(payload)
+    .select("id");
+  throwIfError(error);
+  if (!data || data.length !== inputs.length)
+    throw new Error("The imported contact count could not be verified.");
+  notifyDataChanged();
+  return data.map((row) => row.id as string);
 }
 
 export async function updateContact(
