@@ -26,6 +26,12 @@ import type {
   TaskStatus,
 } from "@/types/db";
 import { cachedBrowserQuery, invalidateBrowserQueries } from "./query-cache.ts";
+import {
+  activityDateRange,
+  sanitizeContactSearch,
+  type PipelineActivityFilter,
+  type PipelineOwnerFilter,
+} from "./pipeline.ts";
 
 const contactSummarySelect = `
   id,name,instagram,whatsapp,email,location,billing_name,billing_contact,billing_address,met_at,stage,assigned_to,notes,created_by,created_at,last_touched_at,
@@ -94,14 +100,6 @@ function normalizeTask(task: Task): Task {
   };
 }
 
-function sanitizeSearch(value: string) {
-  return value
-    .replace(/[,%_()\"]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 100);
-}
-
 export async function listContactsPage(
   supabase: SupabaseClient,
   options: {
@@ -118,7 +116,7 @@ export async function listContactsPage(
   if (options.filter === "leads")
     query = query.in("stage", ["new", "contacted", "replied", "negotiating"]);
   if (options.filter === "customers") query = query.eq("stage", "customer");
-  const search = sanitizeSearch(options.query ?? "");
+  const search = sanitizeContactSearch(options.query ?? "");
   if (search) {
     const pattern = `%${search}%`;
     query = query.or(
@@ -237,11 +235,8 @@ export async function listContactPayments(
 
 export async function listPipelineContacts(
   supabase: SupabaseClient,
-  limits: Partial<Record<ContactStage, number>>,
-): Promise<{
-  rows: Record<ContactStage, Contact[]>;
-  totals: Record<ContactStage, number>;
-}> {
+  options: PipelineQueryOptions,
+): Promise<PipelineResult> {
   const stages: ContactStage[] = [
     "new",
     "contacted",
@@ -250,21 +245,46 @@ export async function listPipelineContacts(
     "customer",
     "lost",
   ];
+  const pageSize = Math.max(
+    1,
+    Math.min(Math.floor(options.pageSize ?? 40) || 40, 100),
+  );
+  const search = sanitizeContactSearch(options.query ?? "");
+  const owner = options.owner ?? "all";
+  const activity = options.activity ?? "all";
+  const dateRange = activityDateRange(activity);
   const results = await Promise.all(
     stages.map(async (stage) => {
-      const limit = Math.max(1, Math.min(limits[stage] ?? 40, 200));
-      const { data, count, error } = await supabase
+      const page = Math.max(1, Math.floor(options.pages?.[stage] ?? 1) || 1);
+      const from = (page - 1) * pageSize;
+      let request = supabase
         .from("contacts")
         .select(contactSummarySelect, { count: "exact" })
-        .eq("stage", stage)
+        .eq("stage", stage);
+      if (search) {
+        const pattern = `%${search}%`;
+        request = request.or(
+          `name.ilike.${pattern},email.ilike.${pattern},instagram.ilike.${pattern},whatsapp.ilike.${pattern},location.ilike.${pattern}`,
+        );
+      }
+      if (owner === "unassigned") request = request.is("assigned_to", null);
+      else if (owner !== "all") request = request.eq("assigned_to", owner);
+      if (dateRange.afterExclusive)
+        request = request.gt("last_touched_at", dateRange.afterExclusive);
+      if (dateRange.beforeInclusive)
+        request = request.lte("last_touched_at", dateRange.beforeInclusive);
+      const { data, count, error } = await request
         .order("last_touched_at", { ascending: true })
         .order("id", { ascending: true })
-        .limit(limit);
+        .range(from, from + pageSize - 1);
       throwIfError(error);
+      const total = count ?? 0;
       return {
         stage,
         rows: ((data ?? []) as unknown as Contact[]).map(normalizeContact),
-        total: count ?? 0,
+        total,
+        page,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
       };
     }),
   );
@@ -274,8 +294,29 @@ export async function listPipelineContacts(
   const totals = Object.fromEntries(
     results.map((result) => [result.stage, result.total]),
   ) as Record<ContactStage, number>;
-  return { rows, totals };
+  const pages = Object.fromEntries(
+    results.map((result) => [result.stage, result.page]),
+  ) as Record<ContactStage, number>;
+  const totalPages = Object.fromEntries(
+    results.map((result) => [result.stage, result.totalPages]),
+  ) as Record<ContactStage, number>;
+  return { rows, totals, pages, totalPages };
 }
+
+export type PipelineQueryOptions = {
+  query?: string;
+  owner?: PipelineOwnerFilter;
+  activity?: PipelineActivityFilter;
+  pageSize?: number;
+  pages?: Partial<Record<ContactStage, number>>;
+};
+
+export type PipelineResult = {
+  rows: Record<ContactStage, Contact[]>;
+  totals: Record<ContactStage, number>;
+  pages: Record<ContactStage, number>;
+  totalPages: Record<ContactStage, number>;
+};
 
 export async function listAttentionContacts(
   supabase: SupabaseClient,

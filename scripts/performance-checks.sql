@@ -8,6 +8,13 @@ order by last_touched_at desc, id desc
 limit 25;
 
 explain (costs, verbose)
+select id, name, stage, last_touched_at
+from public.contacts
+where stage = 'negotiating'
+order by last_touched_at asc, id asc
+limit 40;
+
+explain (costs, verbose)
 select id, description, spent_on
 from public.expenses
 order by spent_on desc, id desc

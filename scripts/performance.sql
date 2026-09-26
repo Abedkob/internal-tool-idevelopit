@@ -82,6 +82,8 @@ create trigger on_contact_touch_base
 
 create index if not exists contacts_last_touched_idx
   on contacts (last_touched_at asc, id asc);
+create index if not exists contacts_stage_touch_idx
+  on contacts (stage, last_touched_at asc, id asc);
 create index if not exists contacts_active_touch_idx
   on contacts (last_touched_at asc, id asc)
   where stage in ('new','contacted','replied','negotiating');
